@@ -27,21 +27,21 @@ $TARGETS = @{
     # see https://en.wikipedia.org/wiki/Windows_10_version_history
     "windows-10" = @{
         search = "windows 10 19045 amd64" # aka 22H2.
-                edition = if ($edition -in @("core", "home", "multi")) { "Core" } else { "Professional" }
+        edition = if ($edition -eq "core") { "Core" } elseif ($edition -eq "multi") { "Multi" } else { "Professional" }
         virtualEdition = $null
     }
     # see https://en.wikipedia.org/wiki/Windows_11
     # see https://en.wikipedia.org/wiki/Windows_11_version_history
     "windows-11old" = @{
         search = "windows 11 22631 amd64" # aka 23H2.
-                edition = if ($edition -in @("core", "home", "multi")) { "Core" } else { "Professional" }
+        edition = if ($edition -eq "core") { "Core" } elseif ($edition -eq "multi") { "Multi" } else { "Professional" }
         virtualEdition = $null
     }
     # see https://en.wikipedia.org/wiki/Windows_11
     # see https://en.wikipedia.org/wiki/Windows_11_version_history
     "windows-11" = @{
         search = "windows 11 26100 amd64" # aka 24H2.
-                edition = if ($edition -in @("core", "home", "multi")) { "Core" } else { "Professional" }
+        edition = if ($edition -eq "core") { "Core" } elseif ($edition -eq "multi") { "Multi" } else { "Professional" }
         virtualEdition = $null
     }
 }
@@ -163,7 +163,12 @@ function Get-UupDumpIso($name, $target) {
                 Write-Host "Skipping. Expected langs=$lang. Got langs=$($langs -join ',')."
                 $result = $false
             }
-            if (($editions -notcontains $target.edition) -and ($editions -notcontains "core")) {
+            if ($target.edition -contains "Multi"){
+                if (($editions -notcontains "Professional") -and ($editions -notcontains "core")) {
+                    Write-Host "Skipping. Expected editions=$($target.edition). Got editions=$($editions -join ',')."
+                    $result = $false
+            }
+            else ($editions -notcontains $target.edition) {
                 Write-Host "Skipping. Expected editions=$($target.edition). Got editions=$($editions -join ',')."
                 $result = $false
             }
@@ -182,13 +187,13 @@ function Get-UupDumpIso($name, $target) {
                 apiUrl = 'https://api.uupdump.net/get.php?' + (New-QueryString @{
                     id = $id
                     lang = $lang
-                    edition = if ($edition -eq "multi") { "core;$($target.edition)" } else { $target.edition }
+                    edition = if ($edition -eq "multi") { "core;professional" } else { $target.edition }
                     #noLinks = '1' # do not return the files download urls.
                 })
                 downloadUrl = 'https://uupdump.net/download.php?' + (New-QueryString @{
                     id = $id
                     pack = $lang
-                    edition = if ($edition -eq "multi") { "core;$($target.edition)" } else { $target.edition }
+                    edition = if ($edition -eq "multi") { "core;professional" } else { $target.edition }
                 })
                 # NB you must use the HTTP POST method to invoke this packageUrl
                 #    AND in the body you must include:
@@ -198,7 +203,7 @@ function Get-UupDumpIso($name, $target) {
                 downloadPackageUrl = 'https://uupdump.net/get.php?' + (New-QueryString @{
                     id = $id
                     pack = $lang
-                    edition = if ($edition -eq "multi") { "core;$($target.edition)" } else { $target.edition }
+                    edition = if ($edition -eq "multi") { "core;Professional)" } else { $target.edition }
                 })
             }
         }
