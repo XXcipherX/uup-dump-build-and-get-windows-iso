@@ -2,7 +2,7 @@
 param(
     [string]$windowsTargetName,
     [string]$destinationDirectory='output',
-    [ValidateSet("pro", "core", "multi")]
+    [ValidateSet("pro", "core", "multi", "home")]
     [string]$edition = "pro",
     [ValidateSet("nb-no", "fr-ca", "fi-fi", "lv-lv", "es-es", "en-gb", "zh-tw", "th-th", "sv-se", "en-us", "es-mx", "bg-bg", "hr-hr", "pt-br", "el-gr", "cs-cz", "it-it", "sk-sk", "pl-pl", "sl-si", "neutral", "ja-jp", "et-ee", "ro-ro", "fr-fr", "pt-pt", "ar-sa", "lt-lt", "hu-hu", "da-dk", "zh-cn", "uk-ua", "tr-tr", "ru-ru", "nl-nl", "he-il", "ko-kr", "sr-latn-rs", "de-de")]
     [string]$lang = "en-us",
@@ -27,21 +27,21 @@ $TARGETS = @{
     # see https://en.wikipedia.org/wiki/Windows_10_version_history
     "windows-10" = @{
         search = "windows 10 19045 amd64" # aka 22H2.
-        edition = if ($edition -eq "core") { "Core" } elseif ($edition -eq "multi") { "Core" } else { "Professional" }
+        edition = if ($edition -in @("core", "home")) { "Core" } elseif ($edition -in @("multi")) { "multi" } else { "Professional" }
         virtualEdition = $null
     }
     # see https://en.wikipedia.org/wiki/Windows_11
     # see https://en.wikipedia.org/wiki/Windows_11_version_history
     "windows-11old" = @{
         search = "windows 11 22631 amd64" # aka 23H2.
-        edition = if ($edition -eq "core") { "Core" } elseif ($edition -eq "multi") { "Core" } else { "Professional" }
+        edition = if ($edition -in @("core", "home")) { "Core" } elseif ($edition -in @("multi")) { "multi" } else { "Professional" }
         virtualEdition = $null
     }
     # see https://en.wikipedia.org/wiki/Windows_11
     # see https://en.wikipedia.org/wiki/Windows_11_version_history
     "windows-11" = @{
         search = "windows 11 26100 amd64" # aka 24H2.
-        edition = if ($edition -eq "core") { "Core" } elseif ($edition -eq "multi") { "Core" } else { "Professional" }
+        edition = if ($edition -in @("core", "home")) { "Core" } elseif ($edition -in @("multi")) { "multi" } else { "Professional" }
         virtualEdition = $null
     }
 }
@@ -125,7 +125,6 @@ function Get-UupDumpIso($name, $target) {
                 info = $result.response.updateInfo
             }
             $langs = $_.Value.langs.PSObject.Properties.Name
-            Write-Host "$langs"
             $editions = if ($langs -contains $lang) {
                 Write-Host "Getting the $name $id editions metadata"
                 $result = Invoke-UupDumpApi listeditions @{

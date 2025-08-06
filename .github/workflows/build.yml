@@ -1,5 +1,5 @@
 name: build
-run-name: Build ${{ inputs.versions }}
+run-name: Build ${{ inputs.versions }} ${{ inputs.edition }} ${{ inputs.language }} ${{ inputs.esd }} ${{ inputs.drivers }} ${{ inputs.netfx3 }}
 
 on:
   workflow_dispatch:
@@ -13,6 +13,74 @@ on:
         - Windows 10 22H2
         default: Windows 11 24H2
         required: true
+      edition:
+        description: "Windows edition to build"
+        type: choice
+        options:
+        - Pro
+        - Home
+        - Multi
+        default: Pro
+        required: true
+      language:
+        description: "Language to add"
+        type: choice
+        options:
+        - ar-sa
+        - bg-bg
+        - cs-cz
+        - da-dk
+        - de-de
+        - el-gr
+        - en-gb
+        - en-us
+        - es-es
+        - es-mx
+        - et-ee
+        - fi-fi
+        - fr-ca
+        - fr-fr
+        - he-il
+        - hr-hr
+        - hu-hu
+        - it-it
+        - ja-jp
+        - ko-kr
+        - lt-lt
+        - lv-lv
+        - nb-no
+        - nl-nl
+        - pl-pl
+        - pt-br
+        - pt-pt
+        - ro-ro
+        - ru-ru
+        - sk-sk
+        - sl-si
+        - sr-latn-rs
+        - sv-se
+        - th-th
+        - tr-tr
+        - uk-ua
+        - zh-cn
+        - zh-tw
+        default: en-us
+        required: true
+      esd:
+        description: "Use ESD compression"
+        type: boolean
+        required: true
+        default: true
+      drivers:
+        description: "Add additional drivers"
+        type: boolean
+        required: true
+        default: true
+      netfx3:
+        description: "Add .NET Framework 3.5"
+        type: boolean
+        required: true
+        default: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,21 +97,35 @@ jobs:
       # NB GitHub-hosted runners have limited available disk space.
       #    see https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
       - name: Show available disk space before build
-        run: Get-PSDrive -PSProvider FileSystem
+        run: |
+          Get-PSDrive -PSProvider FileSystem
+          echo "options= " >> $env:GITHUB_ENV
 
       # NB we are writing outside of the current working/job directory
       #    because it does not have sufficient available disk space.
+      - name: Enable ESD
+        if: ${{ inputs.esd }}
+        run: echo "options=${{ env.options }} -esd" >> $env:GITHUB_ENV
+
+      - name: Enable additional drivers
+        if: ${{ inputs.drivers }}
+        run: echo "options=${{ env.options }} -drivers" >> $env:GITHUB_ENV
+
+      - name: Enable ESD
+        if: ${{ inputs.netfx3 }}
+        run: echo "options=${{ env.options }} -netfx3" >> $env:GITHUB_ENV
+
       - name: Build Windows 11 24H2
         if: ${{ inputs.versions == 'Windows 11 24H2' }}
-        run: pwsh uup-dump-get-windows-iso.ps1 windows-11 c:/output
+        run: pwsh uup-dump-get-windows-iso.ps1 windows-11 c:/output -edition ${{ inputs.edition }} -lang ${{ inputs.language }}
 
       - name: Build Windows 11 23H2
         if: ${{ inputs.versions == 'Windows 11 23H2' }}
-        run: pwsh uup-dump-get-windows-iso.ps1 windows-11old c:/output
+        run: pwsh uup-dump-get-windows-iso.ps1 windows-11old c:/output -edition ${{ inputs.edition }} -lang ${{ inputs.language }}
 
       - name: Build Windows 10 22H2
         if: ${{ inputs.versions == 'Windows 10 22H2' }}
-        run: pwsh uup-dump-get-windows-iso.ps1 windows-10 c:/output
+        run: pwsh uup-dump-get-windows-iso.ps1 windows-10 c:/output -edition ${{ inputs.edition }} -lang ${{ inputs.language }}
 
       - name: Show available disk space after build
         run: Get-PSDrive -PSProvider FileSystem
