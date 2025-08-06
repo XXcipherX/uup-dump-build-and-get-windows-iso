@@ -1,7 +1,15 @@
 #!/usr/bin/pwsh
 param(
     [string]$windowsTargetName,
-    [string]$destinationDirectory='output'
+    [string]$destinationDirectory='output',
+    [ValidateSet("pro", "core", "multi")]
+    [string]$edition = "pro",
+    [ValidateSet("nb-no", "fr-ca", "fi-fi", "lv-lv", "es-es", "en-gb", "zh-tw", "th-th", "sv-se", "en-us", "es-mx", "bg-bg", "hr-hr", "pt-br", "el-gr", "cs-cz", "it-it", "sk-sk", "pl-pl", "sl-si", "neutral", "ja-jp", "et-ee", "ro-ro", "fr-fr", "pt-pt", "ar-sa", "lt-lt", "hu-hu", "da-dk", "zh-cn", "uk-ua", "tr-tr", "ru-ru", "nl-nl", "he-il", "ko-kr", "sr-latn-rs", "de-de")]
+    [string]$lang = "en-us",
+    [switch]$esd,
+    [switch]$drivers,
+    [switch]$netfx3
+
 )
 
 Set-StrictMode -Version Latest
@@ -19,21 +27,21 @@ $TARGETS = @{
     # see https://en.wikipedia.org/wiki/Windows_10_version_history
     "windows-10" = @{
         search = "windows 10 19045 amd64" # aka 22H2.
-        edition = "Professional"
+        edition = if ($edition -eq "core") { "Core" } elseif ($edition -eq "multi") { "Core" } else { "Professional" }
         virtualEdition = $null
     }
     # see https://en.wikipedia.org/wiki/Windows_11
     # see https://en.wikipedia.org/wiki/Windows_11_version_history
     "windows-11old" = @{
         search = "windows 11 22631 amd64" # aka 23H2.
-        edition = "Professional"
+        edition = if ($edition -eq "core") { "Core" } elseif ($edition -eq "multi") { "Core" } else { "Professional" }
         virtualEdition = $null
     }
     # see https://en.wikipedia.org/wiki/Windows_11
     # see https://en.wikipedia.org/wiki/Windows_11_version_history
     "windows-11" = @{
         search = "windows 11 26100 amd64" # aka 24H2.
-        edition = "Professional"
+        edition = if ($edition -eq "core") { "Core" } elseif ($edition -eq "multi") { "Core" } else { "Professional" }
         virtualEdition = $null
     }
 }
@@ -117,15 +125,16 @@ function Get-UupDumpIso($name, $target) {
                 info = $result.response.updateInfo
             }
             $langs = $_.Value.langs.PSObject.Properties.Name
-            $editions = if ($langs -contains 'pl-pl') {
+            Write-Host "$langs"
+            $editions = if ($langs -contains $lang) {
                 Write-Host "Getting the $name $id editions metadata"
                 $result = Invoke-UupDumpApi listeditions @{
                     id = $id
-                    lang = 'pl-pl'
+                    lang = $lang
                 }
                 $result.response.editionFancyNames
             } else {
-                Write-Host "Skipping. Expected langs=pl-pl. Got langs=$($langs -join ',')."
+                Write-Host "Skipping. Expected langs=$lang. Got langs=$($langs -join ',')."
                 [PSCustomObject]@{}
             }
             $_.Value | Add-Member -NotePropertyMembers @{
@@ -151,8 +160,8 @@ function Get-UupDumpIso($name, $target) {
             #     Write-Host "Skipping. Expected ring=$expectedRing. Got ring=$ring."
             #     $result = $false
             # }
-            if ($langs -notcontains 'pl-pl') {
-                Write-Host "Skipping. Expected langs=pl-pl. Got langs=$($langs -join ',')."
+            if ($langs -notcontains $lang) {
+                Write-Host "Skipping. Expected langs=$lang. Got langs=$($langs -join ',')."
                 $result = $false
             }
             if (($editions -notcontains $target.edition) -and ($editions -notcontains "core")) {
@@ -173,14 +182,14 @@ function Get-UupDumpIso($name, $target) {
                 virtualEdition = $target.virtualEdition
                 apiUrl = 'https://api.uupdump.net/get.php?' + (New-QueryString @{
                     id = $id
-                    lang = 'pl-pl'
-                    edition = "core;" + $target.edition
+                    lang = $lang
+                    edition = if ($edition -eq "multi") { "core;$($target.edition)" } else { $target.edition }
                     #noLinks = '1' # do not return the files download urls.
                 })
                 downloadUrl = 'https://uupdump.net/download.php?' + (New-QueryString @{
                     id = $id
-                    pack = 'pl-pl'
-                    edition = "core;" + $target.edition
+                    pack = $lang
+                    edition = if ($edition -eq "multi") { "core;$($target.edition)" } else { $target.edition }
                 })
                 # NB you must use the HTTP POST method to invoke this packageUrl
                 #    AND in the body you must include:
@@ -189,8 +198,8 @@ function Get-UupDumpIso($name, $target) {
                 #           autodl=3 updates=1 cleanup=1 virtualEditions[]=Enterprise
                 downloadPackageUrl = 'https://uupdump.net/get.php?' + (New-QueryString @{
                     id = $id
-                    pack = 'pl-pl'
-                    edition = "core;" + $target.edition
+                    pack = $lang
+                    edition = if ($edition -eq "multi") { "core;$($target.edition)" } else { $target.edition }
                 })
             }
         }
@@ -279,10 +288,16 @@ function Get-WindowsIso($name, $destinationDirectory) {
     $convertConfig = (Get-Content $buildDirectory/ConvertConfig.ini) `
         -replace '^(AutoExit\s*)=.*','$1=1' `
         -replace '^(ResetBase\s*)=.*','$1=1' `
-        -replace '^(wim2esd\s*)=.*','$1=1' `
-        -replace '^(AddDrivers\s*)=.*','$1=1' `
-        -replace '^(NetFx3\s*)=.*','$1=1' `
         -replace '^(Cleanup\s*)=.*','$1=1'
+    if ($esd) {
+        $convertConfig = $convertConfig -replace '^(wim2esd\s*)=.*', '$1=1'
+    }
+    if ($drivers) {
+        $convertConfig = $convertConfig -replace '^(AddDrivers\s*)=.*', '$1=1'
+    }
+    if ($netfx3) {
+        $convertConfig = $convertConfig -replace '^(NetFx3\s*)=.*', '$1=1'
+    }
     if ($iso.virtualEdition) {
         $convertConfig = $convertConfig `
             -replace '^(StartVirtual\s*)=.*','$1=1' `
