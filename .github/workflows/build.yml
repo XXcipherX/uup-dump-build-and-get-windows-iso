@@ -99,7 +99,7 @@ jobs:
       - name: Show available disk space before build
         run: |
           Get-PSDrive -PSProvider FileSystem
-          echo "options= " >> $env:GITHUB_ENV
+          echo "options=" >> $env:GITHUB_ENV
 
       # NB we are writing outside of the current working/job directory
       #    because it does not have sufficient available disk space.
