@@ -158,11 +158,9 @@ jobs:
             } else {
               $finalImageName = $imageNames -join '/'
             }
-          } elseif ($imageNames.Count -eq 1) {
+          } else ($imageNames.Count -eq 1) {
             $finalImageName = $imageNames[0]
-          } else {
-            $finalImageName = ''
-          }
+          } 
 
           Add-Content $env:GITHUB_STEP_SUMMARY @"
           | Property | Value |
