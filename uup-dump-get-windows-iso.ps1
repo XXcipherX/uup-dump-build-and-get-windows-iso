@@ -170,12 +170,12 @@ function Get-UupDumpIso($name, $target) {
                     $result = $false
                 }
             }
-            else ($editions -notcontains $target.edition) {
+            elseif ($editions -notcontains $target.edition){
                 Write-Host "Skipping. Expected editions=$($target.edition). Got editions=$($editions -join ',')."
                 $result = $false
             }
-            
             $result
+        } `
         | Select-Object -First 1 `
         | ForEach-Object {
             $id = $_.Value.uuid
