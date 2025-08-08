@@ -1,5 +1,5 @@
 name: build
-run-name: Build ${{ inputs.versions }} ${{ inputs.edition }} ${{ inputs.language }}
+run-name: Build ${{ inputs.versions }} ${{ inputs.edition }} ${{ inputs.language }} ${{ inputs.esd != '' ? 'ESD' }} ${{ inputs.drivers != '' ? 'DRIVERS' }} ${{ inputs.netfx3 != '' ? 'NetFX3' }}
 
 on:
   workflow_dispatch:
@@ -181,13 +181,13 @@ jobs:
           echo "images=$($finalImageName)" >> $env:GITHUB_ENV
           echo "RUN_NAME=$($finalImageName) $($iso.version) ($($iso.build))" >> $GITHUB_ENV
           $tagname = "v$($iso.build).$($iso.version).${{ inputs.language }}"
-          if ($esd) {
+          if (${{ inputs.esd }}) {
               $tagname = $tagname + ".ESD"
           }
-          if ($drivers) {
+          if (${{ inputs.drivers }}) {
               $tagname = $tagname + ".DRIVERS"
           }
-          if ($netfx3) {
+          if (${{ inputs.netfx3 }}) {
               $tagname = $tagname + ".NETFX3"
           }
           echo "tagname=$tagname" >> $env:GITHUB_ENV
