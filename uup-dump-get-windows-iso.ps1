@@ -294,6 +294,7 @@ function Get-WindowsIso($name, $destinationDirectory) {
         -replace '^(AutoExit\s*)=.*','$1=1' `
         -replace '^(ResetBase\s*)=.*','$1=1' `
         -replace '^(Cleanup\s*)=.*','$1=1'
+    $tag = "asd"
     if ($esd) {
         $convertConfig = $convertConfig -replace '^(wim2esd\s*)=.*', '$1=1'
     }
@@ -351,7 +352,7 @@ function Get-WindowsIso($name, $destinationDirectory) {
                 title = $iso.title
                 build = $iso.build
                 version = $verbuild
-                tags = "asd"
+                tags = $tag
                 checksum = $isoChecksum
                 images = @($windowsImages)
                 uupDump = @{
