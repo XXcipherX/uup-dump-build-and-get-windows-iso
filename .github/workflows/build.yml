@@ -70,17 +70,17 @@ on:
         description: "Use ESD compression"
         type: boolean
         required: true
-        default: true
+        default: false
       drivers:
         description: "Add additional drivers"
         type: boolean
         required: true
-        default: true
+        default: false
       netfx3:
         description: "Add .NET Framework 3.5"
         type: boolean
         required: true
-        default: true
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
