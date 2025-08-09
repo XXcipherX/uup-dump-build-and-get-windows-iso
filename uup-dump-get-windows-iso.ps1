@@ -297,15 +297,15 @@ function Get-WindowsIso($name, $destinationDirectory) {
     $tag = ""
     if ($esd) {
         $convertConfig = $convertConfig -replace '^(wim2esd\s*)=.*', '$1=1'
-        $tag = $tag + ".ESD"
+        $tag = $tag + ".E"
     }
     if ($drivers) {
         $convertConfig = $convertConfig -replace '^(AddDrivers\s*)=.*', '$1=1'
-        $tag = $tag + ".DRIVERS"
+        $tag = $tag + ".D"
     }
     if ($netfx3) {
         $convertConfig = $convertConfig -replace '^(NetFx3\s*)=.*', '$1=1'
-        $tag = $tag + ".NetFX3"
+        $tag = $tag + ".N"
     }
     if ($iso.virtualEdition) {
         $convertConfig = $convertConfig `
