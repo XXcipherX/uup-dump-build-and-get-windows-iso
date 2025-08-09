@@ -2,10 +2,13 @@
 param(
     [string]$windowsTargetName,
     [string]$destinationDirectory='output',
+    [ValidateSet("x64", "arm64")]
+    [string]$architecture = "x64",
     [ValidateSet("pro", "core", "multi", "home")]
     [string]$edition = "pro",
     [ValidateSet("nb-no", "fr-ca", "fi-fi", "lv-lv", "es-es", "en-gb", "zh-tw", "th-th", "sv-se", "en-us", "es-mx", "bg-bg", "hr-hr", "pt-br", "el-gr", "cs-cz", "it-it", "sk-sk", "pl-pl", "sl-si", "neutral", "ja-jp", "et-ee", "ro-ro", "fr-fr", "pt-pt", "ar-sa", "lt-lt", "hu-hu", "da-dk", "zh-cn", "uk-ua", "tr-tr", "ru-ru", "nl-nl", "he-il", "ko-kr", "sr-latn-rs", "de-de")]
     [string]$lang = "en-us",
+    [switch]$preview,
     [switch]$esd,
     [switch]$drivers,
     [switch]$netfx3
@@ -22,27 +25,30 @@ trap {
     Exit 1
 }
 
+$arch = if ($architecture -eq "x64") { "amd64" } elseif ($architecture -eq "arm64") { "arm64" }
+
 $TARGETS = @{
     # see https://en.wikipedia.org/wiki/Windows_10
     # see https://en.wikipedia.org/wiki/Windows_10_version_history
     "windows-10" = @{
-        search = "windows 10 19045 amd64" # aka 22H2.
+        search = "windows 10 19045 $arch" # aka 22H2.
         edition = if ($edition -eq "core" -or $edition -eq "home") { "Core" } elseif ($edition -eq "multi") { "Multi" } else { "Professional" }
         virtualEdition = $null
     }
     # see https://en.wikipedia.org/wiki/Windows_11
     # see https://en.wikipedia.org/wiki/Windows_11_version_history
     "windows-11old" = @{
-        search = "windows 11 22631 amd64" # aka 23H2.
+        search = "windows 11 22631 $arch" # aka 23H2.
         edition = if ($edition -eq "core" -or $edition -eq "home") { "Core" } elseif ($edition -eq "multi") { "Multi" } else { "Professional" }
         virtualEdition = $null
     }
     # see https://en.wikipedia.org/wiki/Windows_11
     # see https://en.wikipedia.org/wiki/Windows_11_version_history
     "windows-11" = @{
-        search = "windows 11 26100 amd64" # aka 24H2.
+        search = "windows 11 26100 $arch" # aka 24H2.
         edition = if ($edition -eq "core" -or $edition -eq "home") { "Core" } elseif ($edition -eq "multi") { "Multi" } else { "Professional" }
         virtualEdition = $null
+        if ($preview) { ring = "Canary" }
     }
 }
 
@@ -146,13 +152,19 @@ function Get-UupDumpIso($name, $target) {
             #   1. are from the expected ring/channel (default retail)
             #   2. have the english language
             #   3. match the requested edition
+            $ring = "Canary"
             $langs = $_.Value.langs.PSObject.Properties.Name
             $editions = $_.Value.editions.PSObject.Properties.Name
             $result = $true
-            # if ($ring -ne 'RETAIL') {
-            #     Write-Host "Skipping. Expected ring=RETAIL. Got ring=$ring."
-            #     $result = $false
-            # }
+            $expectedRing = if ($target.PSObject.Properties.Name -contains 'ring') {
+                $target.ring
+            } else {
+                'RETAIL'
+            }
+            if ($ring -ne $expectedRing) {
+                Write-Host "Skipping. Expected ring=$expectedRing. Got ring=$ring."
+                $result = $false
+            }
             if ($langs -notcontains $lang) {
                 Write-Host "Skipping. Expected langs=$lang. Got langs=$($langs -join ',')."
                 $result = $false
@@ -299,9 +311,11 @@ function Get-WindowsIso($name, $destinationDirectory) {
         $convertConfig = $convertConfig -replace '^(wim2esd\s*)=.*', '$1=1'
         $tag = $tag + ".E"
     }
-    if ($drivers) {
+    if ($drivers -And $arch -ne "arm64" ) {
         $convertConfig = $convertConfig -replace '^(AddDrivers\s*)=.*', '$1=1'
         $tag = $tag + ".D"
+        Write-Host "Copy Dell drivers to $buildDirectory directory"	
+        Copy-Item -Path Drivers -Destination $buildDirectory/Drivers -Recurse
     }
     if ($netfx3) {
         $convertConfig = $convertConfig -replace '^(NetFx3\s*)=.*', '$1=1'
@@ -317,9 +331,6 @@ function Get-WindowsIso($name, $destinationDirectory) {
         -Encoding ascii `
         -Path $buildDirectory/ConvertConfig.ini `
         -Value $convertConfig
-
-    Write-Host "Copy Dell drivers to $buildDirectory directory"	
-    Copy-Item -Path Drivers -Destination $buildDirectory/Drivers -Recurse
 
     Write-Host "Creating the $title iso file inside the $buildDirectory directory"
     Push-Location $buildDirectory
