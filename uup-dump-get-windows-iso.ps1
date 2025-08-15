@@ -45,9 +45,10 @@ $TARGETS = @{
     # see https://en.wikipedia.org/wiki/Windows_11
     # see https://en.wikipedia.org/wiki/Windows_11_version_history
     "windows-11" = @{
-        search = "windows 11 $(if (!$preview) { '26100 ' } else { 'preview ' })$arch" # aka 24H2.
+        search = "windows 11 $(if (!$preview) { '26100 ' } else { 'preview' })$arch" # aka 24H2.
         edition = $(if ($edition -eq "core" -or $edition -eq "home") { "Core" } elseif ($edition -eq "multi") { "Multi" } else { "Professional" })
         virtualEdition = $null
+        ring = $(if ($preview) { 'CANARY' } else { $null })
     }
 }
 
@@ -132,7 +133,6 @@ function Get-UupDumpIso($name, $target) {
                 info = $result.response.updateInfo
             }
             $langs = $_.Value.langs.PSObject.Properties.Name
-            
             $editions = if ($langs -contains $lang) {
                 Write-Host "Getting the $name $id editions metadata"
                 $result = Invoke-UupDumpApi listeditions @{
@@ -157,8 +157,8 @@ function Get-UupDumpIso($name, $target) {
             $langs = $_.Value.langs.PSObject.Properties.Name
             $editions = $_.Value.editions.PSObject.Properties.Name
             $result = $true
-            $expectedRing = if ($preview) {
-                'CANARY'
+            $expectedRing = if ($target.PSObject.Properties.Name -contains 'ring') {
+                $target.ring
             } else {
                 'RETAIL'
             }
@@ -247,7 +247,7 @@ function Get-IsoWindowsImages($isoPath) {
 
 function Get-WindowsIso($name, $destinationDirectory) {
     $iso = Get-UupDumpIso $name $TARGETS.$name
-    if (-not ($iso.title -match 'version')) {
+    if (-not $preview && -not ($iso.title -match 'version')) {
       throw "Unexpected title format: missing 'version'"
     }
     $parts = $iso.title -split 'version\s*'
