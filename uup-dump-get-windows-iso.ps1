@@ -45,10 +45,36 @@ $TARGETS = @{
     # see https://en.wikipedia.org/wiki/Windows_11
     # see https://en.wikipedia.org/wiki/Windows_11_version_history
     "windows-11" = @{
-        search = "windows 11 $(if (!$preview) { '26100 ' } else { 'preview ' })$arch" # aka 24H2.
+        search = "windows 11 26100 $arch" # aka 24H2.
         edition = $(if ($edition -eq "core" -or $edition -eq "home") { "Core" } elseif ($edition -eq "multi") { "Multi" } else { "Professional" })
         virtualEdition = $null
-        ring = $(if ($preview) { 'CANARY' } else { $null })
+    }
+    # see https://en.wikipedia.org/wiki/Windows_11
+    # see https://en.wikipedia.org/wiki/Windows_11_version_history
+    "windows-11beta" = @{
+        search = "windows 11 preview $arch" # aka 24H2.
+        edition = $(if ($edition -eq "core" -or $edition -eq "home") { "Core" } elseif ($edition -eq "multi") { "Multi" } else { "Professional" })
+        virtualEdition = $null
+        ring = 'Beta'
+        preview = true
+    }
+    # see https://en.wikipedia.org/wiki/Windows_11
+    # see https://en.wikipedia.org/wiki/Windows_11_version_history
+    "windows-11dev" = @{
+        search = "windows 11 preview $arch" # aka 24H2.
+        edition = $(if ($edition -eq "core" -or $edition -eq "home") { "Core" } elseif ($edition -eq "multi") { "Multi" } else { "Professional" })
+        virtualEdition = $null
+        ring = 'Dev'
+        preview = true
+    }
+    # see https://en.wikipedia.org/wiki/Windows_11
+    # see https://en.wikipedia.org/wiki/Windows_11_version_history
+    "windows-11canary" = @{
+        search = "windows 11 preview $arch" # aka 24H2.
+        edition = $(if ($edition -eq "core" -or $edition -eq "home") { "Core" } elseif ($edition -eq "multi") { "Multi" } else { "Professional" })
+        virtualEdition = $null
+        ring = 'Canary'
+        preview = true
     }
 }
 
@@ -93,7 +119,7 @@ function Get-UupDumpIso($name, $target) {
             $_
         } `
         | Where-Object {
-            if (!$preview) {
+            if (!$target.preview) {
                 $result = $target.search -like '*preview*' -or $_.Value.title -notlike '*preview*'
                 if (-not $result) {
                     Write-Host "Skipping. Expected preview=false. Got preview=true."
@@ -247,7 +273,7 @@ function Get-IsoWindowsImages($isoPath) {
 
 function Get-WindowsIso($name, $destinationDirectory) {
     $iso = Get-UupDumpIso $name $TARGETS.$name
-    if (!$preview) {
+    if (!$target.preview) {
          if (-not ($iso.title -match 'version')) {
            throw "Unexpected title format: missing 'version'"
          }
@@ -264,7 +290,7 @@ function Get-WindowsIso($name, $destinationDirectory) {
      #    }
     }
     else {
-         $verbuild = "Insider"
+         $verbuild = $target.ring
     }
     $buildDirectory = "$destinationDirectory/$name"
     $destinationIsoPath = "$buildDirectory.iso"
