@@ -28,6 +28,15 @@ $arch = if ($architecture -eq "x64") { "amd64" } elseif ($architecture -eq "arm6
 
 if ($windowsTargetName -match "beta|dev|canary") { 
      $preview = $true
+     if ($windowsTargetName -match "beta") { 
+         $ring = "beta"
+     }
+     elseif ($windowsTargetName -match "dev") { 
+          $ring = "dev"
+     }
+     elseif ($windowsTargetName -match "canary") { 
+          $ring = "canary"
+     }
 }
 
 $TARGETS = @{
@@ -55,7 +64,7 @@ $TARGETS = @{
     # see https://en.wikipedia.org/wiki/Windows_11
     # see https://en.wikipedia.org/wiki/Windows_11_version_history
     "windows-11beta" = @{
-        search = "windows 11 preview $arch" # aka 24H2.
+        search = "windows 11 26120 $arch" # aka 24H2.
         edition = $(if ($edition -eq "core" -or $edition -eq "home") { "Core" } elseif ($edition -eq "multi") { "Multi" } else { "Professional" })
         virtualEdition = $null
         ring = 'Beta'
@@ -63,7 +72,7 @@ $TARGETS = @{
     # see https://en.wikipedia.org/wiki/Windows_11
     # see https://en.wikipedia.org/wiki/Windows_11_version_history
     "windows-11dev" = @{
-        search = "windows 11 preview $arch" # aka 24H2.
+        search = "windows 11 26200 $arch" # aka 24H2.
         edition = $(if ($edition -eq "core" -or $edition -eq "home") { "Core" } elseif ($edition -eq "multi") { "Multi" } else { "Professional" })
         virtualEdition = $null
         ring = 'Dev'
@@ -290,7 +299,7 @@ function Get-WindowsIso($name, $destinationDirectory) {
      #    }
     }
     else {
-         $verbuild = $expectedRing
+         $verbuild = $ring
     }
     $buildDirectory = "$destinationDirectory/$name"
     $destinationIsoPath = "$buildDirectory.iso"
