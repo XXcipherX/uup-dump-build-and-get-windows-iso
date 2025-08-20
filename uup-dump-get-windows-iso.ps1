@@ -116,8 +116,8 @@ function Get-UupDumpIso($name, $target) {
             if ($ringLower) {
                 $actual = ($_.Value.info.ring).ToUpper()
                 if ($ringLower -in @('dev','beta')) {
-                    if ($actual -notin @($expectedRing, 'WIF')) {
-                        Write-Host "Skipping. Expected ring match for $expectedRing or WIF. Got ring=$actual."
+                    if ($actual -notin @($expectedRing, 'WIF', 'WIS')) {
+                        Write-Host "Skipping. Expected ring match for $expectedRing, WIS or WIF. Got ring=$actual."
                         $res = $false
                     }
                 }
