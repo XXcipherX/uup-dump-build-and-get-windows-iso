@@ -113,13 +113,20 @@ function Get-UupDumpIso($name, $target) {
             $editions = $_.Value.editions.PSObject.Properties.Name
             $res = $true
             $expectedRing = if ($ringLower) { $ringLower.ToUpper() } else { 'RETAIL' }
-            $ringPattern = $ringLower
-            if ($ringLower -in @('dev','beta')) {
-                $ringPattern = $ringLower + "|WIP"
-            }
-            if ($ringPattern -and ($_.Value.info.ring -notmatch $ringPattern)) {
-                Write-Host "Skipping. Expected ring match for $ringPattern. Got ring=$($_.Value.info.ring)."
-                $res = $false
+            if ($ringLower) {
+                $actual = ($_.Value.info.ring).ToUpper()
+                if ($ringLower -in @('dev','beta')) {
+                    if ($actual -notin @($expectedRing, 'WIP')) {
+                        Write-Host "Skipping. Expected ring match for $expectedRing or WIP. Got ring=$actual."
+                        $res = $false
+                    }
+                }
+                else {
+                    if ($actual -ne $expectedRing) {
+                        Write-Host "Skipping. Expected ring match for $expectedRing. Got ring=$actual."
+                        $res = $false
+                    }
+                }
             }
             if ($langs -notcontains $lang) {
                 Write-Host "Skipping. Expected langs=$lang. Got langs=$($langs -join ',')."
