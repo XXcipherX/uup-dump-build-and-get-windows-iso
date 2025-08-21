@@ -3,11 +3,19 @@ run-name: >
   ${{ inputs.versions }}
   ${{ fromJSON('{"Pro":"PRO","Home":"HOME","Multi":"MULTI"}')[inputs.edition] }}
   ${{ fromJSON('{"x64":"X64","arm64":"ARM64"}')[inputs.architecture] }}
-  ${{ fromJSON('{"ar-sa":"AR","bg-bg":"BG","cs-cz":"CS","da-dk":"DA","de-de":"DE","el-gr":"EL","en-gb":"EN","en-us":"EN","es-es":"ES","es-mx":"ES","et-ee":"ET","fi-fi":"FI","fr-ca":"FR","fr-fr":"FR","he-il":"HE","hr-hr":"HR","hu-hu":"HU","it-it":"IT","ja-jp":"JA","ko-kr":"KO","lt-lt":"LT","lv-lv":"LV","nb-no":"NB","nl-nl":"NL","pl-pl":"PL","pt-br":"PT","pt-pt":"PT","ro-ro":"RO","ru-ru":"RU","sk-sk":"SK","sl-si":"SL","sr-latn-rs":"SR","sv-se":"SV","th-th":"TH","tr-tr":"TR","uk-ua":"UK","zh-cn":"ZH","zh-tw":"ZH"}')[inputs.language] }}
+  ${{ fromJSON('{
+    "Arabic (Saudi Arabia)":"AR","Bulgarian (Bulgaria)":"BG","Czech (Czech Republic)":"CS","Danish (Denmark)":"DA","German (Germany)":"DE","Greek (Greece)":"EL",
+    "English (United Kingdom)":"EN","English (United States)":"EN","Spanish (Spain)":"ES","Spanish (Mexico)":"ES","Estonian (Estonia)":"ET","Finnish (Finland)":"FI",
+    "French (Canada)":"FR","French (France)":"FR","Hebrew (Israel)":"HE","Croatian (Croatia)":"HR","Hungarian (Hungary)":"HU","Italian (Italy)":"IT",
+    "Japanese (Japan)":"JA","Korean (Korea)":"KO","Lithuanian (Lithuania)":"LT","Latvian (Latvia)":"LV","Norwegian Bokmål (Norway)":"NB",
+    "Dutch (Netherlands)":"NL","Polish (Poland)":"PL","Portuguese (Brazil)":"PT","Portuguese (Portugal)":"PT","Romanian (Romania)":"RO","Russian (Russia)":"RU",
+    "Slovak (Slovakia)":"SK","Slovenian (Slovenia)":"SL","Serbian (Latin, Serbia)":"SR","Swedish (Sweden)":"SV","Thai (Thailand)":"TH","Turkish (Turkey)":"TR",
+    "Ukrainian (Ukraine)":"UK","Chinese (Simplified, China)":"ZH","Chinese (Traditional, Taiwan)":"ZH"
+  }')[inputs.language] }}
   ${{ inputs.esd && 'ESD' || '' }}
   ${{ inputs.drivers && 'DRIVERS' || '' }}
   ${{ inputs.netfx3 && 'NETFX3' || '' }}
-  
+
 on:
   workflow_dispatch:
     inputs:
@@ -21,12 +29,12 @@ on:
         description: "Windows version to build"
         type: choice
         options:
-        - Windows 10 22H2
-        - Windows 11 23H2
-        - Windows 11 24H2
-        - Windows 11 24H2 BETA
-        - Windows 11 25H2 DEV
-        - Windows 11 Canary
+          - Windows 10 22H2
+          - Windows 11 23H2
+          - Windows 11 24H2
+          - Windows 11 24H2 BETA
+          - Windows 11 25H2 DEV
+          - Windows 11 Canary
         default: Windows 11 24H2
         required: true
       edition:
@@ -39,45 +47,45 @@ on:
         description: "Language"
         type: choice
         options:
-        - ar-sa
-        - bg-bg
-        - cs-cz
-        - da-dk
-        - de-de
-        - el-gr
-        - en-gb
-        - en-us
-        - es-es
-        - es-mx
-        - et-ee
-        - fi-fi
-        - fr-ca
-        - fr-fr
-        - he-il
-        - hr-hr
-        - hu-hu
-        - it-it
-        - ja-jp
-        - ko-kr
-        - lt-lt
-        - lv-lv
-        - nb-no
-        - nl-nl
-        - pl-pl
-        - pt-br
-        - pt-pt
-        - ro-ro
-        - ru-ru
-        - sk-sk
-        - sl-si
-        - sr-latn-rs
-        - sv-se
-        - th-th
-        - tr-tr
-        - uk-ua
-        - zh-cn
-        - zh-tw
-        default: en-us
+          - Arabic (Saudi Arabia)
+          - Bulgarian (Bulgaria)
+          - Czech (Czech Republic)
+          - Danish (Denmark)
+          - German (Germany)
+          - Greek (Greece)
+          - English (United Kingdom)
+          - English (United States)
+          - Spanish (Spain)
+          - Spanish (Mexico)
+          - Estonian (Estonia)
+          - Finnish (Finland)
+          - French (Canada)
+          - French (France)
+          - Hebrew (Israel)
+          - Croatian (Croatia)
+          - Hungarian (Hungary)
+          - Italian (Italy)
+          - Japanese (Japan)
+          - Korean (Korea)
+          - Lithuanian (Lithuania)
+          - Latvian (Latvia)
+          - Norwegian Bokmål (Norway)
+          - Dutch (Netherlands)
+          - Polish (Poland)
+          - Portuguese (Brazil)
+          - Portuguese (Portugal)
+          - Romanian (Romania)
+          - Russian (Russia)
+          - Slovak (Slovakia)
+          - Slovenian (Slovenia)
+          - Serbian (Latin, Serbia)
+          - Swedish (Sweden)
+          - Thai (Thailand)
+          - Turkish (Turkey)
+          - Ukrainian (Ukraine)
+          - Chinese (Simplified, China)
+          - Chinese (Traditional, Taiwan)
+        default: English (United States)
         required: true
       esd:
         description: "Use ESD compression"
@@ -106,30 +114,78 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Init options
+      - name: Map inputs
+        id: map
         shell: pwsh
-        run: echo "options=" >> $env:GITHUB_ENV
+        run: |
+          $langMap = @{
+            'Arabic (Saudi Arabia)'='ar-sa'
+            'Bulgarian (Bulgaria)'='bg-bg'
+            'Czech (Czech Republic)'='cs-cz'
+            'Danish (Denmark)'='da-dk'
+            'German (Germany)'='de-de'
+            'Greek (Greece)'='el-gr'
+            'English (United Kingdom)'='en-gb'
+            'English (United States)'='en-us'
+            'Spanish (Spain)'='es-es'
+            'Spanish (Mexico)'='es-mx'
+            'Estonian (Estonia)'='et-ee'
+            'Finnish (Finland)'='fi-fi'
+            'French (Canada)'='fr-ca'
+            'French (France)'='fr-fr'
+            'Hebrew (Israel)'='he-il'
+            'Croatian (Croatia)'='hr-hr'
+            'Hungarian (Hungary)'='hu-hu'
+            'Italian (Italy)'='it-it'
+            'Japanese (Japan)'='ja-jp'
+            'Korean (Korea)'='ko-kr'
+            'Lithuanian (Lithuania)'='lt-lt'
+            'Latvian (Latvia)'='lv-lv'
+            'Norwegian Bokmål (Norway)'='nb-no'
+            'Dutch (Netherlands)'='nl-nl'
+            'Polish (Poland)'='pl-pl'
+            'Portuguese (Brazil)'='pt-br'
+            'Portuguese (Portugal)'='pt-pt'
+            'Romanian (Romania)'='ro-ro'
+            'Russian (Russia)'='ru-ru'
+            'Slovak (Slovakia)'='sk-sk'
+            'Slovenian (Slovenia)'='sl-si'
+            'Serbian (Latin, Serbia)'='sr-latn-rs'
+            'Swedish (Sweden)'='sv-se'
+            'Thai (Thailand)'='th-th'
+            'Turkish (Turkey)'='tr-tr'
+            'Ukrainian (Ukraine)'='uk-ua'
+            'Chinese (Simplified, China)'='zh-cn'
+            'Chinese (Traditional, Taiwan)'='zh-tw'
+          }
 
-      - name: Enable ESD
-        if: ${{ inputs.esd }}
-        shell: pwsh
-        run: echo "options=$env:options -esd" >> $env:GITHUB_ENV
+          $verMap = @{
+            'Windows 10 22H2'      = 'windows-10'
+            'Windows 11 23H2'      = 'windows-11old'
+            'Windows 11 24H2'      = 'windows-11'
+            'Windows 11 24H2 BETA' = 'windows-11beta'
+            'Windows 11 25H2 DEV'  = 'windows-11dev'
+            'Windows 11 Canary'    = 'windows-11canary'
+          }
 
-      - name: Enable additional drivers
-        if: ${{ inputs.drivers }}
-        shell: pwsh
-        run: echo "options=$env:options -drivers" >> $env:GITHUB_ENV
+          $langCode = $langMap['${{ inputs.language }}']
+          $verCode  = $verMap['${{ inputs.versions }}']
 
-      - name: Enable .NET Framework 3.5
-        if: ${{ inputs.netfx3 }}
-        shell: pwsh
-        run: echo "options=$env:options -netfx3" >> $env:GITHUB_ENV
+          $opts = ''
+          if ('${{ inputs.esd }}' -eq 'true')     { $opts += ' -esd' }
+          if ('${{ inputs.drivers }}' -eq 'true') { $opts += ' -drivers' }
+          if ('${{ inputs.netfx3 }}' -eq 'true')  { $opts += ' -netfx3' }
+          $opts = $opts.Trim()
+
+          echo "lang=$langCode"    >> $env:GITHUB_OUTPUT
+          echo "version=$verCode"  >> $env:GITHUB_OUTPUT
+          echo "options=$opts"     >> $env:GITHUB_OUTPUT
 
       - name: Build Windows
         id: build_windows
         shell: pwsh
         run: |
-          pwsh uup-dump-get-windows-iso.ps1 ${{ (inputs.versions) == 'Windows 10 22H2' && ' windows-10 ' || (inputs.versions) == 'Windows 11 23H2' && ' windows-11old ' || (inputs.versions) == 'Windows 11 24H2' && ' windows-11 ' || (inputs.versions) == 'Windows 11 24H2 BETA' && ' windows-11beta ' || (inputs.versions) == 'Windows 11 25H2 DEV' && ' windows-11dev ' || (inputs.versions) == 'Windows 11 Canary' && ' windows-11canary ' }} c:/output -architecture ${{ inputs.architecture }} -edition ${{ inputs.edition }} -lang ${{ inputs.language }} ${{ env.options }}
+          pwsh uup-dump-get-windows-iso.ps1 ${{ steps.map.outputs.version }} c:/output -architecture ${{ inputs.architecture }} -edition ${{ inputs.edition }} -lang ${{ steps.map.outputs.lang }} ${{ steps.map.outputs.options }}
           echo "iso_name=$env:ISO_NAME" >> $env:GITHUB_OUTPUT
 
       - name: Create split zip
@@ -143,7 +199,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ISO_NAME }}
-          path: c:/output/*.ISO
+          path: |
+            c:/Windows/Logs/DISM/DrvWinPE.log
+            c:/output/*.ISO
           if-no-files-found: error
 
       - name: Build summary
@@ -201,7 +259,7 @@ jobs:
           echo "name=$($iso.name)" >> $env:GITHUB_ENV
           echo "title=$($iso.title)" >> $env:GITHUB_ENV
           echo "images=$($finalImageName)" >> $env:GITHUB_ENV
-          echo "tagname=$($iso.build).$($iso.version).${{ fromJSON('{"Pro":"PRO","Home":"HOME","Multi":"MULTI"}')[inputs.edition] }}.${{ fromJSON('{"x64":"X64","arm64":"ARM64"}')[inputs.architecture] }}.${{ fromJSON('{"ar-sa":"AR","bg-bg":"BG","cs-cz":"CS","da-dk":"DA","de-de":"DE","el-gr":"EL","en-gb":"EN","en-us":"EN","es-es":"ES","es-mx":"ES","et-ee":"ET","fi-fi":"FI","fr-ca":"FR","fr-fr":"FR","he-il":"HE","hr-hr":"HR","hu-hu":"HU","it-it":"IT","ja-jp":"JA","ko-kr":"KO","lt-lt":"LT","lv-lv":"LV","nb-no":"NB","nl-nl":"NL","pl-pl":"PL","pt-br":"PT","pt-pt":"PT","ro-ro":"RO","ru-ru":"RU","sk-sk":"SK","sl-si":"SL","sr-latn-rs":"SR","sv-se":"SV","th-th":"TH","tr-tr":"TR","uk-ua":"UK","zh-cn":"ZH","zh-tw":"ZH"}')[inputs.language] }}$($iso.tags)" >> $env:GITHUB_ENV
+          echo "tagname=$($iso.build).$($iso.version).${{ fromJSON('{"Pro":"PRO","Home":"HOME","Multi":"MULTI"}')[inputs.edition] }}.${{ fromJSON('{"x64":"X64","arm64":"ARM64"}')[inputs.architecture] }}.${{ fromJSON('{"ar-sa":"AR","bg-bg":"BG","cs-cz":"CS","da-dk":"DA","de-de":"DE","el-gr":"EL","en-gb":"EN","en-us":"EN","es-es":"ES","es-mx":"ES","et-ee":"ET","fi-fi":"FI","fr-ca":"FR","fr-fr":"FR","he-il":"HE","hr-hr":"HR","hu-hu":"HU","it-it":"IT","ja-jp":"JA","ko-kr":"KO","lt-lt":"LT","lv-lv":"LV","nb-no":"NB","nl-nl":"NL","pl-pl":"PL","pt-br":"PT","pt-pt":"PT","ro-ro":"RO","ru-ru":"RU","sk-sk":"SK","sl-si":"SL","sr-latn-rs":"SR","sv-se":"SV","th-th":"TH","tr-tr":"TR","uk-ua":"UK","zh-cn":"ZH","zh-tw":"ZH"}')[steps.map.outputs.lang] }}$($iso.tags)" >> $env:GITHUB_ENV
 
       - name: Create Release
         id: create_release
