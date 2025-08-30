@@ -12,8 +12,9 @@ This supports the following Windows Builds:
 * `windows-11old`: Windows 11 22631 (aka 23H2)
 * `windows-11`: Windows 11 26100 (aka 24H2)
 * `windows-11beta`: Windows 11 26120 (aka 24H2 BETA)
-* `windows-11beta`: Windows 11 26120 (aka 24H2 BETA)
-* `windows-11beta`: Windows 11 26120 (aka 24H2 BETA)
+* `windows-11new`: Windows 11 26200 (aka 25H2)
+* `windows-11dev`: Windows 11 26220 (aka 25H2 DEV)
+* `windows-11canary`: Windows 11 Insider Preview (aka CANARY)
 
 ## Usage
 
