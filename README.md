@@ -4,7 +4,9 @@ This creates an iso file with the latest Windows available from the [Unified Upd
 
 This shrink wraps the [UUP dump](https://git.uupdump.net/uup-dump) project into a single command.
 
-This can be executed in a Windows x64 or arm64 host (min. 21H2).
+## The whole was written for the use with Github Actions.
+
+## You can also executed directly on a Windows x64 or arm64 host (min. 21H2).
 
 ## This supports the following: 
 Windows Builds:
