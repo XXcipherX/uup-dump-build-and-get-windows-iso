@@ -354,7 +354,7 @@ jobs:
           }
 
           # Linia checksum ISO do osadzenia (wartość policzona w kroku build)
-          $isoLine = "${{ env.iso_checksum }}  ${{ env.ISO_NAME }}"
+          $isoLine = "echo( ${{ env.iso_checksum }}  ${{ env.ISO_NAME }}"
 
           $utils = Join-Path $ws "Utils"
 
