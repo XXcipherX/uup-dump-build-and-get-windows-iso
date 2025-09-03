@@ -332,92 +332,96 @@ jobs:
           if (-not $tag) { $tag = gh release view --json tagName -q '.tagName' }
           if (-not $tag) { throw "Cannot resolve release tag." }
 
-          $owner,$repo = $env:GITHUB_REPOSITORY.Split('/')
-
-          $assetNames = gh release view $tag --json assets -q '.assets[].name' | Where-Object { $_ -match '\.zip\.\d{3}$' }
-          $assetNames = $assetNames | Sort-Object { [int]($_ -replace '.*\.(\d{3})$', '$1') }
-          $urls = $assetNames | ForEach-Object { "https://github.com/$owner/$repo/releases/download/$tag/$_" }
-
-          $localParts = Get-ChildItem "C:/output/${{ env.ISO_NAME }}.zip.0*" | Sort-Object Name
-
           $ws   = $env:GITHUB_WORKSPACE
           $dist = Join-Path $ws "dist"
           New-Item -ItemType Directory -Force -Path $dist | Out-Null
 
-          $partsPath    = Join-Path $dist "parts.txt"
-          $partsShaPath = Join-Path $dist "parts.sha256"
-          $isoShaPath   = Join-Path $dist "iso.sha256"
+          # Ścieżki wyjściowe
+          $partsPath  = Join-Path $dist "parts.txt"
+          $isoShaPath = Join-Path $dist "iso.sha256"
 
-          [System.IO.File]::WriteAllLines($partsPath, $urls)
-          $partShaLines = foreach ($p in $localParts) {
-            $h = (Get-FileHash -Algorithm SHA256 $p.FullName).Hash.ToLowerInvariant()
-            "$h  $($p.Name)"
+          # Zbuduj parts.txt: URL + checksum + out=... (aria2 będzie weryfikować na podstawie tego pliku)
+          $assets = gh release view $tag --json assets | ConvertFrom-Json
+          if (-not $assets -or -not $assets.assets) { throw "No assets found for release $tag." }
+
+          $urlLines = @()
+          foreach ($a in $assets.assets) {
+            if ($a.name -match '\.zip\.\d{3}$') {
+              if (-not $a.browser_download_url) { throw "Missing browser_download_url for $($a.name)" }
+              if (-not $a.checksum -or -not $a.checksum.sha256) { throw "Checksum not available from GitHub for asset: $($a.name)" }
+              $sha = $a.checksum.sha256.ToLowerInvariant()
+              $urlLines += $a.browser_download_url
+              $urlLines += "  checksum=sha-256=$sha"
+              $urlLines += "  out=$($a.name)"
+            }
           }
-          Set-Content -Path $partsShaPath -Value $partShaLines -Encoding UTF8
-          Set-Content -Path $isoShaPath   -Value ("${{ env.iso_checksum }}  ${{ env.ISO_NAME }}") -Encoding UTF8
+          if ($urlLines.Count -eq 0) { throw "No split part assets (*.zip.###) found on release $tag." }
 
+          [System.IO.File]::WriteAllLines($partsPath, $urlLines)
+          Set-Content -Path $isoShaPath -Value ("${{ env.iso_checksum }}  ${{ env.ISO_NAME }}") -Encoding ASCII
+
+          # Lokalizacje binariów w repozytorium
           $utils = Join-Path $ws "Utils"
 
-          function New-PS1 {
+          function New-BAT {
             param([string]$destDir)
             $lines = @(
-              'param([string]$OutputDir = ".")'
-              '$ErrorActionPreference = "Stop"'
-              '$here = Split-Path -Parent $MyInvocation.MyCommand.Path'
-              '$list = Join-Path $here "parts.txt"'
-              '$partsSha = Join-Path $here "parts.sha256"'
-              '$isoSha = Join-Path $here "iso.sha256"'
-              '$aria = Join-Path $here "bin/aria2c.exe"'
-              '$sevenZip = (Get-ChildItem -Path (Join-Path $here "bin") -Filter "7z*.exe" | Select-Object -First 1).FullName'
-              '& $aria --input-file="$list" --dir="$OutputDir" --auto-file-renaming=false --allow-overwrite=true --continue=true --max-concurrent-downloads=16 --split=16 --min-split-size=1M --console-log-level=warn --summary-interval=0'
-              '$re = [regex]''^(?<hash>[0-9a-f]{64})\s{2}(?<name>.+)$'''
-              'Get-Content $partsSha | ForEach-Object {'
-              '  $m = $re.Match($_); if ($m.Success) {'
-              '    $exp = $m.Groups["hash"].Value.ToLower(); $name = $m.Groups["name"].Value'
-              '    $fp = Join-Path $OutputDir $name'
-              '    $act = (Get-FileHash -Algorithm SHA256 $fp).Hash.ToLower()'
-              '    if ($act -ne $exp) { throw "Checksum mismatch for $name" }'
-              '  }'
-              '}'
-              '$firstPart = Get-ChildItem -Path $OutputDir -Filter "*.zip.001" | Select-Object -First 1'
-              '& $sevenZip x $firstPart.FullName "-o$OutputDir" -y | Out-Null'
-              '$isoPath = Get-ChildItem -Path $OutputDir -Filter "*.iso" | Select-Object -First 1'
-              '$isoLine = Get-Content $isoSha | Select-Object -First 1'
-              '$m2 = [regex]::Match($isoLine, ''^(?<hash>[0-9a-f]{64})\s{2}(?<name>.+)$'')'
-              '$expectedIso = $m2.Groups[''hash''].Value.ToLower()'
-              '$actualIso = (Get-FileHash -Algorithm SHA256 $isoPath.FullName).Hash.ToLower()'
-              'if ($actualIso -ne $expectedIso) { throw "ISO checksum mismatch" }'
-              'Write-Host "ISO verified: $($isoPath.Name)"'
+              '@echo off',
+              'setlocal ENABLEDELAYEDEXPANSION',
+              'set "OutputDir=%~1"',
+              'if not defined OutputDir set "OutputDir=."',
+              'set "HERE=%~dp0"',
+              'set "LIST=%HERE%parts.txt"',
+              'set "ISOFILE=%HERE%iso.sha256"',
+              'set "ARIA=%HERE%bin\aria2c.exe"',
+              'set "SEVENZIP=%HERE%bin\7za.exe"',
+              'if not exist "%ARIA%"  (echo ERROR: missing bin\aria2c.exe & exit /b 1)',
+              'if not exist "%SEVENZIP%" (echo ERROR: missing bin\7za.exe & exit /b 1)',
+              '"%ARIA%" --input-file="%LIST%" --dir="%OutputDir%" --auto-file-renaming=false --allow-overwrite=true --continue=true --max-concurrent-downloads=16 --split=16 --min-split-size=1M --check-integrity=true --console-log-level=warn --summary-interval=0',
+              'if errorlevel 1 (echo ERROR: aria2 download failed & exit /b 1)',
+              'for /f "delims=" %%P in (''dir /b /a:-d "%OutputDir%\*.zip.001" 2^>nul'') do set "FIRST=%%P"',
+              'if not defined FIRST (echo ERROR: No *.zip.001 found & exit /b 1)',
+              '"%SEVENZIP%" x "%OutputDir%\%FIRST%" -o"%OutputDir%" -y >nul',
+              'for /f "delims=" %%I in (''dir /b /a:-d "%OutputDir%\*.iso" 2^>nul'') do set "ISO=%%I"',
+              'if not defined ISO (echo ERROR: ISO not found & exit /b 1)',
+              'for /f "usebackq tokens=1,2" %%H in ("%ISOFILE%") do ( set "EXPECTEDISO=%%H" )',
+              'for /f "skip=1 tokens=* delims=" %%S in (''certutil -hashfile "%OutputDir%\%ISO%" SHA256'') do ( if not defined ACTISO set "ACTISO=%%S" )',
+              'set "ACTISO=!ACTISO: =!"',
+              'set "ACTISO=!ACTISO:~0,64!"',
+              'if /I not "!ACTISO!"=="!EXPECTEDISO!" ( echo ERROR: ISO checksum mismatch & exit /b 1 )',
+              'echo ISO verified: %ISO%',
+              'exit /b 0'
             )
-            $path = Join-Path $destDir 'get-with-aria2.ps1'
-            Set-Content -Path $path -Value ($lines -join "`r`n") -Encoding UTF8
+            $path = Join-Path $destDir 'get-with-aria2.cmd'
+            Set-Content -Path $path -Value ($lines -join "`r`n") -Encoding ASCII
           }
 
           function New-SH {
             param([string]$destDir)
             $lines = @(
-              '#!/usr/bin/env bash'
-              'set -euo pipefail'
-              'OUT_DIR="${1:-.}"'
-              'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"'
-              'LIST_FILE="${SCRIPT_DIR}/parts.txt"'
-              'PARTS_SHA="${SCRIPT_DIR}/parts.sha256"'
-              'ISO_SHA="${SCRIPT_DIR}/iso.sha256"'
-              'ARIA2="${SCRIPT_DIR}/bin/aria2c"'
-              'SEVEN_ZIP="$(ls "${SCRIPT_DIR}/bin/"7z* 2>/dev/null | head -n1)"'
-              'chmod +x "${ARIA2}" 2>/dev/null || true'
-              'chmod +x "${SEVEN_ZIP}" 2>/dev/null || true'
-              '"${ARIA2}" --input-file="${LIST_FILE}" --dir="${OUT_DIR}" --auto-file-renaming=false --allow-overwrite=true --continue=true --max-concurrent-downloads=16 --split=16 --min-split-size=1M --console-log-level=warn --summary-interval=0'
-              'firstpart="$(ls "${OUT_DIR}"/*.zip.001 2>/dev/null | head -n1 || true)"'
-              '"${SEVEN_ZIP}" x "$firstpart" -o"${OUT_DIR}" -y >/dev/null'
-              'iso="$(ls "${OUT_DIR}"/*.ISO 2>/dev/null | head -n1 || true)"'
-              'expected_hash="$(cut -d" " -f1 "${ISO_SHA}")"'
-              'if command -v sha256sum >/dev/null 2>&1; then'
-              '  actual_hash="$(sha256sum "${iso}" | awk "{print \$1}")"'
-              'else'
-              '  actual_hash="$(shasum -a 256 "${iso}" | awk "{print \$1}")"'
-              'fi'
-              '[ "${actual_hash}" = "${expected_hash}" ] || { echo "ISO checksum mismatch" >&2; exit 1; }'
+              '#!/usr/bin/env bash',
+              'set -euo pipefail',
+              'OUT_DIR="${1:-.}"',
+              'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+              'LIST_FILE="${SCRIPT_DIR}/parts.txt"',
+              'ISO_SHA="${SCRIPT_DIR}/iso.sha256"',
+              'ARIA2="${SCRIPT_DIR}/bin/aria2c"',
+              'SEVEN_ZIP="$(ls "${SCRIPT_DIR}/bin/"7z* 2>/dev/null | head -n1)"',
+              'chmod +x "${ARIA2}" 2>/dev/null || true',
+              'chmod +x "${SEVEN_ZIP}" 2>/dev/null || true',
+              '"${ARIA2}" --input-file="${LIST_FILE}" --dir="${OUT_DIR}" --auto-file-renaming=false --allow-overwrite=true --continue=true --max-concurrent-downloads=16 --split=16 --min-split-size=1M --check-integrity=true --console-log-level=warn --summary-interval=0',
+              'firstpart="$(ls "${OUT_DIR}"/*.zip.001 2>/dev/null | head -n1 || true)"',
+              '[ -n "${firstpart}" ] || { echo "ERROR: No *.zip.001 found" >&2; exit 1; }',
+              '"${SEVEN_ZIP}" x "$firstpart" -o"${OUT_DIR}" -y >/dev/null',
+              'iso="$(ls "${OUT_DIR}"/*.iso 2>/dev/null | head -n1 || true)"',
+              '[ -n "${iso}" ] || { echo "ERROR: ISO not found" >&2; exit 1; }',
+              'expected_hash="$(cut -d" " -f1 "${ISO_SHA}")"',
+              'if command -v sha256sum >/dev/null 2>&1; then',
+              '  actual_hash="$(sha256sum "${iso}" | awk "{print \$1}")"',
+              'else',
+              '  actual_hash="$(shasum -a 256 "${iso}" | awk "{print \$1}")"',
+              'fi',
+              '[ "${actual_hash}" = "${expected_hash}" ] || { echo "ERROR: ISO checksum mismatch" >&2; exit 1; }',
               'echo "ISO verified: $(basename "${iso}")"'
             )
             $path = Join-Path $destDir 'get-with-aria2.sh'
@@ -431,9 +435,9 @@ jobs:
             $binDir = Join-Path $pkgDir "bin"
             New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 
-            Copy-Item $partsPath    $pkgDir -Force
-            Copy-Item $partsShaPath $pkgDir -Force
-            Copy-Item $isoShaPath   $pkgDir -Force
+            # Pliki kontrolne: tylko parts.txt (z checksumami) + iso.sha256
+            Copy-Item $partsPath  $pkgDir -Force
+            Copy-Item $isoShaPath $pkgDir -Force
 
             switch ($platform) {
               'windows' {
@@ -441,16 +445,20 @@ jobs:
                 Copy-Item (Join-Path $utils '7z/win/7za.exe') $binDir -Force
                 Copy-Item (Join-Path $utils '7z/win/7za.dll') $binDir -Force
                 Copy-Item (Join-Path $utils '7z/win/7zxa.dll') $binDir -Force
-                New-PS1 -destDir $pkgDir
+                New-BAT -destDir $pkgDir
               }
               'linux' {
                 Get-ChildItem (Join-Path $utils 'aria2/linux-x64') -Filter 'aria2c*' -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
                 Get-ChildItem (Join-Path $utils '7z/linux-x64') -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
+                # ensure exec bit
+                & bash -lc "chmod +x '$binDir/*' 2>/dev/null || true"
                 New-SH -destDir $pkgDir
               }
               'macos' {
                 Get-ChildItem (Join-Path $utils 'aria2/mac') -Filter 'aria2c*' -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
                 Get-ChildItem (Join-Path $utils '7z/mac') -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
+                # ensure exec bit
+                & bash -lc "chmod +x '$binDir/*' 2>/dev/null || true"
                 New-SH -destDir $pkgDir
               }
             }
