@@ -336,47 +336,52 @@ jobs:
           $dist = Join-Path $ws "dist"
           New-Item -ItemType Directory -Force -Path $dist | Out-Null
 
-          # Ścieżki wyjściowe
-          $partsPath  = Join-Path $dist "parts.txt"
-          $isoShaPath = Join-Path $dist "iso.sha256"
-
-          # Zbuduj parts.txt: URL + checksum + out=... (aria2 będzie weryfikować na podstawie tego pliku)
           $assets = gh release view $tag --json assets | ConvertFrom-Json
           if (-not $assets -or -not $assets.assets) { throw "No assets found for release $tag." }
+          $split = $assets.assets | Where-Object { $_.name -match '\.zip\.\d{3}$' }
+          if (-not $split) { throw "No split part assets (*.zip.###) found on release $tag." }
 
-          $urlLines = @()
-          foreach ($a in $assets.assets) {
-            if ($a.name -match '\.zip\.\d{3}$') {
-              if (-not $a.browser_download_url) { throw "Missing browser_download_url for $($a.name)" }
-              if (-not $a.checksum -or -not $a.checksum.sha256) { throw "Checksum not available from GitHub for asset: $($a.name)" }
-              $sha = $a.checksum.sha256.ToLowerInvariant()
-              $urlLines += $a.browser_download_url
-              $urlLines += "  checksum=sha-256=$sha"
-              $urlLines += "  out=$($a.name)"
-            }
+          $partsLines = @()
+          foreach ($a in ($split | Sort-Object name)) {
+            if (-not $a.browser_download_url) { throw "Missing browser_download_url for $($a.name)" }
+            if (-not $a.checksum -or -not $a.checksum.sha256) { throw "Checksum not available from GitHub for asset: $($a.name)" }
+            $sha = $a.checksum.sha256.ToLowerInvariant()
+            $partsLines += $a.browser_download_url
+            $partsLines += "  checksum=sha-256=$sha"
+            $partsLines += "  out=$($a.name)"
           }
-          if ($urlLines.Count -eq 0) { throw "No split part assets (*.zip.###) found on release $tag." }
 
-          [System.IO.File]::WriteAllLines($partsPath, $urlLines)
-          Set-Content -Path $isoShaPath -Value ("${{ env.iso_checksum }}  ${{ env.ISO_NAME }}") -Encoding ASCII
+          $isoLine = "${{ env.iso_checksum }}  ${{ env.ISO_NAME }}"
 
-          # Lokalizacje binariów w repozytorium
           $utils = Join-Path $ws "Utils"
 
           function New-BAT {
-            param([string]$destDir)
+            param([string]$destDir, [string[]]$PartsLines, [string]$IsoLine)
+            $emitParts = @()
+            foreach ($ln in $PartsLines) {
+              # echo( is safer for special chars in batch
+              $emitParts += '  echo(' + $ln
+            }
             $lines = @(
               '@echo off',
               'setlocal ENABLEDELAYEDEXPANSION',
               'set "OutputDir=%~1"',
               'if not defined OutputDir set "OutputDir=."',
               'set "HERE=%~dp0"',
-              'set "LIST=%HERE%parts.txt"',
-              'set "ISOFILE=%HERE%iso.sha256"',
+              'set "TMPDIR=%TEMP%\uup_parts_%RANDOM%%RANDOM%"',
+              'mkdir "%TMPDIR%" >nul 2>&1',
+              'set "LIST=%TMPDIR%\parts.txt"',
+              'set "ISOFILE=%TMPDIR%\iso.sha256"',
               'set "ARIA=%HERE%bin\aria2c.exe"',
               'set "SEVENZIP=%HERE%bin\7za.exe"',
               'if not exist "%ARIA%"  (echo ERROR: missing bin\aria2c.exe & exit /b 1)',
               'if not exist "%SEVENZIP%" (echo ERROR: missing bin\7za.exe & exit /b 1)',
+              'rem write embedded parts to file',
+              '( '
+            ) + $emitParts + @(
+              ') > "%TMPDIR%\parts.txt"',
+              'rem write embedded iso sha to file',
+              '( echo(' + $IsoLine + ' ) > "%TMPDIR%\iso.sha256"',
               '"%ARIA%" --input-file="%LIST%" --dir="%OutputDir%" --auto-file-renaming=false --allow-overwrite=true --continue=true --max-concurrent-downloads=16 --split=16 --min-split-size=1M --check-integrity=true --console-log-level=warn --summary-interval=0',
               'if errorlevel 1 (echo ERROR: aria2 download failed & exit /b 1)',
               'for /f "delims=" %%P in (''dir /b /a:-d "%OutputDir%\*.zip.001" 2^>nul'') do set "FIRST=%%P"',
@@ -397,18 +402,25 @@ jobs:
           }
 
           function New-SH {
-            param([string]$destDir)
+            param([string]$destDir, [string[]]$PartsLines, [string]$IsoLine)
             $lines = @(
               '#!/usr/bin/env bash',
               'set -euo pipefail',
               'OUT_DIR="${1:-.}"',
               'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
-              'LIST_FILE="${SCRIPT_DIR}/parts.txt"',
-              'ISO_SHA="${SCRIPT_DIR}/iso.sha256"',
+              'TMPDIR="$(mktemp -d 2>/dev/null || mktemp -d -t uup_parts)"',
+              'LIST_FILE="${TMPDIR}/parts.txt"',
+              'ISO_SHA="${TMPDIR}/iso.sha256"',
               'ARIA2="${SCRIPT_DIR}/bin/aria2c"',
               'SEVEN_ZIP="$(ls "${SCRIPT_DIR}/bin/"7z* 2>/dev/null | head -n1)"',
               'chmod +x "${ARIA2}" 2>/dev/null || true',
               'chmod +x "${SEVEN_ZIP}" 2>/dev/null || true',
+              'cat > "${LIST_FILE}" << "EOF_PARTS"'
+            ) + ($PartsLines -join "`n") + @(
+              'EOF_PARTS',
+              'cat > "${ISO_SHA}" << "EOF_ISO"',
+              $IsoLine,
+              'EOF_ISO',
               '"${ARIA2}" --input-file="${LIST_FILE}" --dir="${OUT_DIR}" --auto-file-renaming=false --allow-overwrite=true --continue=true --max-concurrent-downloads=16 --split=16 --min-split-size=1M --check-integrity=true --console-log-level=warn --summary-interval=0',
               'firstpart="$(ls "${OUT_DIR}"/*.zip.001 2>/dev/null | head -n1 || true)"',
               '[ -n "${firstpart}" ] || { echo "ERROR: No *.zip.001 found" >&2; exit 1; }',
@@ -435,31 +447,25 @@ jobs:
             $binDir = Join-Path $pkgDir "bin"
             New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 
-            # Pliki kontrolne: tylko parts.txt (z checksumami) + iso.sha256
-            Copy-Item $partsPath  $pkgDir -Force
-            Copy-Item $isoShaPath $pkgDir -Force
-
             switch ($platform) {
               'windows' {
                 Copy-Item (Join-Path $utils 'aria2/win/aria2c.exe') $binDir -Force
-                Copy-Item (Join-Path $utils '7z/win/7za.exe') $binDir -Force
-                Copy-Item (Join-Path $utils '7z/win/7za.dll') $binDir -Force
-                Copy-Item (Join-Path $utils '7z/win/7zxa.dll') $binDir -Force
-                New-BAT -destDir $pkgDir
+                Copy-Item (Join-Path $utils '7z/win/7za.exe')       $binDir -Force
+                Copy-Item (Join-Path $utils '7z/win/7za.dll')       $binDir -Force
+                Copy-Item (Join-Path $utils '7z/win/7zxa.dll')      $binDir -Force
+                New-BAT -destDir $pkgDir -PartsLines $partsLines -IsoLine $isoLine
               }
               'linux' {
                 Get-ChildItem (Join-Path $utils 'aria2/linux-x64') -Filter 'aria2c*' -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
-                Get-ChildItem (Join-Path $utils '7z/linux-x64') -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
-                # ensure exec bit
+                Get-ChildItem (Join-Path $utils '7z/linux-x64')    -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
                 & bash -lc "chmod +x '$binDir/*' 2>/dev/null || true"
-                New-SH -destDir $pkgDir
+                New-SH -destDir $pkgDir -PartsLines $partsLines -IsoLine $isoLine
               }
               'macos' {
                 Get-ChildItem (Join-Path $utils 'aria2/mac') -Filter 'aria2c*' -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
-                Get-ChildItem (Join-Path $utils '7z/mac') -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
-                # ensure exec bit
+                Get-ChildItem (Join-Path $utils '7z/mac')    -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
                 & bash -lc "chmod +x '$binDir/*' 2>/dev/null || true"
-                New-SH -destDir $pkgDir
+                New-SH -destDir $pkgDir -PartsLines $partsLines -IsoLine $isoLine
               }
             }
 
