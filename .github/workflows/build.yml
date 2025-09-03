@@ -476,7 +476,8 @@ jobs:
               'echo',
               'echo "Done"',
               'echo',
-              'read -rsn1 -p"Press any key to continue";echo'
+              'read -rsn1 -p"Press any key to continue"',
+              'echo'
             )
             $path = Join-Path $destDir 'get-with-aria2.sh'
             Set-Content -Path $path -Value (($lines -join "`n")) -Encoding UTF8
