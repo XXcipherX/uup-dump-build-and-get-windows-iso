@@ -337,20 +337,14 @@ jobs:
           New-Item -ItemType Directory -Force -Path $dist | Out-Null
 
           $assets = gh release view $tag --json assets | ConvertFrom-Json
-          if (-not $assets -or -not $assets.assets) { throw "No assets found for release $tag." }
           $split = $assets.assets | Where-Object { $_.name -match '\.zip\.\d{3}$' }
-          if (-not $split) { throw "No split part assets (*.zip.###) found on release $tag." }
-
           $partsLines = @()
           foreach ($a in ($split | Sort-Object name)) {
-            if (-not $a.browser_download_url) { throw "Missing browser_download_url for $($a.name)" }
-            if (-not $a.checksum -or -not $a.checksum.sha256) { throw "Checksum not available from GitHub for asset: $($a.name)" }
             $sha = $a.checksum.sha256.ToLowerInvariant()
             $partsLines += $a.browser_download_url
             $partsLines += "  checksum=sha-256=$sha"
             $partsLines += "  out=$($a.name)"
           }
-
           $isoLine = "${{ env.iso_checksum }}  ${{ env.ISO_NAME }}"
 
           $utils = Join-Path $ws "Utils"
@@ -358,13 +352,11 @@ jobs:
           function New-BAT {
             param([string]$destDir, [string[]]$PartsLines, [string]$IsoLine)
             $emitParts = @()
-            foreach ($ln in $PartsLines) {
-              # echo( is safer for special chars in batch
-              $emitParts += '  echo(' + $ln
-            }
+            foreach ($ln in $PartsLines) { $emitParts += '  echo(' + $ln }
             $lines = @(
               '@echo off',
               'setlocal ENABLEDELAYEDEXPANSION',
+              '',
               'set "OutputDir=%~1"',
               'if not defined OutputDir set "OutputDir=."',
               'set "HERE=%~dp0"',
@@ -374,27 +366,34 @@ jobs:
               'set "ISOFILE=%TMPDIR%\iso.sha256"',
               'set "ARIA=%HERE%bin\aria2c.exe"',
               'set "SEVENZIP=%HERE%bin\7za.exe"',
-              'if not exist "%ARIA%"  (echo ERROR: missing bin\aria2c.exe & exit /b 1)',
-              'if not exist "%SEVENZIP%" (echo ERROR: missing bin\7za.exe & exit /b 1)',
-              'rem write embedded parts to file',
+              '',
               '( '
             ) + $emitParts + @(
               ') > "%TMPDIR%\parts.txt"',
-              'rem write embedded iso sha to file',
               '( echo(' + $IsoLine + ' ) > "%TMPDIR%\iso.sha256"',
+              '',
+              'echo Starting download parts with Aria2',
+              'echo.',
               '"%ARIA%" --input-file="%LIST%" --dir="%OutputDir%" --auto-file-renaming=false --allow-overwrite=true --continue=true --max-concurrent-downloads=16 --split=16 --min-split-size=1M --check-integrity=true --console-log-level=warn --summary-interval=0',
               'if errorlevel 1 (echo ERROR: aria2 download failed & exit /b 1)',
+              '',
               'for /f "delims=" %%P in (''dir /b /a:-d "%OutputDir%\*.zip.001" 2^>nul'') do set "FIRST=%%P"',
-              'if not defined FIRST (echo ERROR: No *.zip.001 found & exit /b 1)',
-              '"%SEVENZIP%" x "%OutputDir%\%FIRST%" -o"%OutputDir%" -y >nul',
+              'echo Extracting ISO with 7z',
+              'echo.',
+              '"%SEVENZIP%" x "%OutputDir%\%FIRST%" -o"%OutputDir%" -y -bsp1 -bso0',
+              '',
               'for /f "delims=" %%I in (''dir /b /a:-d "%OutputDir%\*.iso" 2^>nul'') do set "ISO=%%I"',
-              'if not defined ISO (echo ERROR: ISO not found & exit /b 1)',
+              'echo Checking ISO hash',
+              'echo.',
               'for /f "usebackq tokens=1,2" %%H in ("%ISOFILE%") do ( set "EXPECTEDISO=%%H" )',
               'for /f "skip=1 tokens=* delims=" %%S in (''certutil -hashfile "%OutputDir%\%ISO%" SHA256'') do ( if not defined ACTISO set "ACTISO=%%S" )',
               'set "ACTISO=!ACTISO: =!"',
               'set "ACTISO=!ACTISO:~0,64!"',
               'if /I not "!ACTISO!"=="!EXPECTEDISO!" ( echo ERROR: ISO checksum mismatch & exit /b 1 )',
+              '',
               'echo ISO verified: %ISO%',
+              'echo.',
+              'echo Done',
               'exit /b 0'
             )
             $path = Join-Path $destDir 'get-with-aria2.cmd'
@@ -406,6 +405,7 @@ jobs:
             $lines = @(
               '#!/usr/bin/env bash',
               'set -euo pipefail',
+              '',
               'OUT_DIR="${1:-.}"',
               'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
               'TMPDIR="$(mktemp -d 2>/dev/null || mktemp -d -t uup_parts)"',
@@ -415,18 +415,27 @@ jobs:
               'SEVEN_ZIP="$(ls "${SCRIPT_DIR}/bin/"7z* 2>/dev/null | head -n1)"',
               'chmod +x "${ARIA2}" 2>/dev/null || true',
               'chmod +x "${SEVEN_ZIP}" 2>/dev/null || true',
+              '',
               'cat > "${LIST_FILE}" << "EOF_PARTS"'
             ) + ($PartsLines -join "`n") + @(
               'EOF_PARTS',
+              '',
               'cat > "${ISO_SHA}" << "EOF_ISO"',
               $IsoLine,
               'EOF_ISO',
+              '',
+              'echo "Starting download parts with Aria2"',
+              'echo',
               '"${ARIA2}" --input-file="${LIST_FILE}" --dir="${OUT_DIR}" --auto-file-renaming=false --allow-overwrite=true --continue=true --max-concurrent-downloads=16 --split=16 --min-split-size=1M --check-integrity=true --console-log-level=warn --summary-interval=0',
+              '',
               'firstpart="$(ls "${OUT_DIR}"/*.zip.001 2>/dev/null | head -n1 || true)"',
-              '[ -n "${firstpart}" ] || { echo "ERROR: No *.zip.001 found" >&2; exit 1; }',
-              '"${SEVEN_ZIP}" x "$firstpart" -o"${OUT_DIR}" -y >/dev/null',
+              'echo "Extracting ISO with 7z"',
+              'echo',
+              '"${SEVEN_ZIP}" x "$firstpart" -o"${OUT_DIR}" -y -bsp1 -bso0',
+              '',
               'iso="$(ls "${OUT_DIR}"/*.ISO 2>/dev/null | head -n1 || true)"',
-              '[ -n "${iso}" ] || { echo "ERROR: ISO not found" >&2; exit 1; }',
+              'echo "Checking ISO hash"',
+              'echo',
               'expected_hash="$(cut -d" " -f1 "${ISO_SHA}")"',
               'if command -v sha256sum >/dev/null 2>&1; then',
               '  actual_hash="$(sha256sum "${iso}" | awk "{print \$1}")"',
@@ -434,7 +443,10 @@ jobs:
               '  actual_hash="$(shasum -a 256 "${iso}" | awk "{print \$1}")"',
               'fi',
               '[ "${actual_hash}" = "${expected_hash}" ] || { echo "ERROR: ISO checksum mismatch" >&2; exit 1; }',
-              'echo "ISO verified: $(basename "${iso}")"'
+              '',
+              'echo "ISO verified: $(basename "${iso}")"',
+              'echo',
+              'echo "Done"'
             )
             $path = Join-Path $destDir 'get-with-aria2.sh'
             Set-Content -Path $path -Value (($lines -join "`n")) -Encoding UTF8
@@ -456,14 +468,14 @@ jobs:
                 New-BAT -destDir $pkgDir -PartsLines $partsLines -IsoLine $isoLine
               }
               'linux' {
-                Get-ChildItem (Join-Path $utils 'aria2/linux-x64') -Filter 'aria2c*' -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
-                Get-ChildItem (Join-Path $utils '7z/linux-x64')    -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
+                Get-ChildItem (Join-Path $utils 'aria2/linux-x64') -Filter 'aria2c*' | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
+                Get-ChildItem (Join-Path $utils '7z/linux-x64')    | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
                 & bash -lc "chmod +x '$binDir/*' 2>/dev/null || true"
                 New-SH -destDir $pkgDir -PartsLines $partsLines -IsoLine $isoLine
               }
               'macos' {
-                Get-ChildItem (Join-Path $utils 'aria2/mac') -Filter 'aria2c*' -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
-                Get-ChildItem (Join-Path $utils '7z/mac')    -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
+                Get-ChildItem (Join-Path $utils 'aria2/mac') -Filter 'aria2c*' | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
+                Get-ChildItem (Join-Path $utils '7z/mac')    | Where-Object { $_.Name -notlike '*.exe' } | Copy-Item -Destination $binDir -Force
                 & bash -lc "chmod +x '$binDir/*' 2>/dev/null || true"
                 New-SH -destDir $pkgDir -PartsLines $partsLines -IsoLine $isoLine
               }
@@ -477,23 +489,3 @@ jobs:
           Copy-Platform -platform 'windows' -arch 'x64'       -zipName 'split-download-windows-x64.zip'
           Copy-Platform -platform 'linux'   -arch 'x64'       -zipName 'split-download-linux-x64.zip'
           Copy-Platform -platform 'macos'   -arch 'universal' -zipName 'split-download-macos-universal.zip'
-
-      - name: Upload platform ZIPs to Release
-        if: ${{ success() }}
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $tag = "${{ env.tagname }}"
-          if (-not $tag) { $tag = gh release view --json tagName -q '.tagName' }
-          $dist = Join-Path $env:GITHUB_WORKSPACE "dist"
-          $files = @(
-            "split-download-windows-x64.zip",
-            "split-download-linux-x64.zip",
-            "split-download-macos-universal.zip"
-          ) | ForEach-Object { Join-Path $dist $_ }
-          foreach ($f in $files) {
-            if (-not (Test-Path $f)) { throw "ZIP not found: $f" }
-            gh release upload $tag "$f" --clobber
-          }
