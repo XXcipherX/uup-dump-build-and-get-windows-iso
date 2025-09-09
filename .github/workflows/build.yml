@@ -429,7 +429,7 @@ jobs:
               '',
               'SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)',
               'LAUNCH_DIR=$(pwd)',
-              'TMPDIR="$LAUNCH_DIR/uup_parts_$$"',
+              'TMPDIR="$LAUNCH_DIR/tmp_dir"',
               'LIST_FILE="$TMPDIR/parts.txt"',
               'ISO_SHA="$TMPDIR/iso.sha256"',
               'ARIA2="$SCRIPT_DIR/bin/aria2c"',
