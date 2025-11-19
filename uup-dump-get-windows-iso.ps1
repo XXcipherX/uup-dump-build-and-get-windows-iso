@@ -119,7 +119,7 @@ $TARGETS = @{
   "windows-11new"    = @{ search="windows 11 26200 $arch"; edition=(Get-EditionName $edition) }
   "windows-11beta"   = @{ search="windows 11 26120 $arch"; edition=(Get-EditionName $edition); ring="Beta" }
   "windows-11dev"    = @{ search="windows 11 26220 $arch"; edition=(Get-EditionName $edition); ring="Wif" }
-  "windows-11canary" = @{ search="windows 11 preview $arch"; edition=(Get-EditionName $edition); ring="Canary" }
+  "windows-11canary" = @{ search="windows 11 $arch"; edition=(Get-EditionName $edition); ring="Canary" }
 }
 
 function New-QueryString([hashtable]$parameters) {
