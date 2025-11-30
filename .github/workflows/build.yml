@@ -93,13 +93,13 @@ on:
         type: boolean
         required: true
         default: false
-      drivers:
-        description: "Add additional drivers"
+      netfx3:
+        description: "Add .NET Framework 3.5"
         type: boolean
         required: true
         default: false
-      netfx3:
-        description: "Add .NET Framework 3.5"
+      drivers:
+        description: "Add additional drivers (only for x64)"
         type: boolean
         required: true
         default: false
@@ -204,15 +204,6 @@ jobs:
           path: c:/output/*.ISO
           if-no-files-found: error
 
-      # - name: Upload DISM Driver log artifact
-      #   if: ${{ inputs.drivers }}
-      #   id: upload_dism_driver_log_artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: DrvWinPE.log
-      #     path: c:/Windows/Logs/DISM/DrvWinPE.log
-      #     if-no-files-found: ignore
-
       - name: Set artifact_url
         id: set_artifact_url
         shell: pwsh
@@ -221,8 +212,6 @@ jobs:
       - name: Build summary
         id: build_summary
         shell: pwsh
-      #  env:
-      #    ARTIFACT_URL: ${{ steps.upload_artifact.outputs.artifact-url }}
         run: |
           $iso = Get-Content (Resolve-Path c:/output/*.json) | ConvertFrom-Json
           $imageNames = $iso.images | ForEach-Object { $_.name }
