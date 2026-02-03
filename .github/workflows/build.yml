@@ -184,7 +184,7 @@ jobs:
           }
 
       - name: Free disk space (safe)
-        shell: powershell
+        shell: pwsh
         run: |
          Write-Host "Free space before:"
          Get-PSDrive C
