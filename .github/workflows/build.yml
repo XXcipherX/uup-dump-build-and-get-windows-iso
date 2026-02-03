@@ -183,6 +183,22 @@ jobs:
             echo "options=$opts"   >> $env:GITHUB_OUTPUT
           }
 
+      - name: Free disk space (safe)
+        shell: powershell
+        run: |
+         Write-Host "Free space before:"
+         Get-PSDrive C
+
+         Remove-Item -Recurse -Force "C:\Program Files\Microsoft Visual Studio" -ErrorAction SilentlyContinue
+         Remove-Item -Recurse -Force "C:\Program Files (x86)\Microsoft Visual Studio" -ErrorAction SilentlyContinue
+         Remove-Item -Recurse -Force "C:\Program Files\Android" -ErrorAction SilentlyContinue
+         Remove-Item -Recurse -Force "C:\ProgramData\chocolatey\lib" -ErrorAction SilentlyContinue
+         Remove-Item -Recurse -Force "$env:TEMP\*" -ErrorAction SilentlyContinue
+         Remove-Item -Recurse -Force "C:\Windows\Temp\*" -ErrorAction SilentlyContinue
+
+         Write-Host "Free space after:"
+         Get-PSDrive C
+
       - name: Build Windows
         id: build_windows
         shell: pwsh
