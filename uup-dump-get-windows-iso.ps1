@@ -330,11 +330,6 @@ function Get-WindowsIso($name, $destinationDirectory) {
   if (Test-Path $buildDirectory) { Remove-Item -Force -Recurse $buildDirectory | Out-Null }
   New-Item -ItemType Directory -Force $buildDirectory | Out-Null
 
-  $customAppsSource = ".\CustomAppsList.txt"
-  $customAppsDest   = "$buildDirectory\CustomAppsList.txt"
-
-  if (Test-Path $customAppsSource) { Write-CleanLine "Copying CustomAppsList.txt to build directory..."; Copy-Item -Path $customAppsSource -Destination $customAppsDest -Force } else { Write-CleanLine "WARNING: CustomAppsList.txt not found, skipping." }
-
   $edn = if ($hasVirtualMember) { $iso.virtualEdition } else { $effectiveEdition }
   Write-CleanLine $edn
   $title = "$name $edn $($iso.build)"
@@ -343,6 +338,11 @@ function Get-WindowsIso($name, $destinationDirectory) {
   $downloadPackageBody = if ($hasVirtualMember) { @{ autodl=3; updates=1; cleanup=1; 'virtualEditions[]'=$iso.virtualEdition } } else { @{ autodl=2; updates=1; cleanup=1 } }
   Invoke-WebRequest -Method Post -Uri $iso.downloadPackageUrl -Body $downloadPackageBody -OutFile "$buildDirectory.zip" | Out-Null
   Expand-Archive "$buildDirectory.zip" $buildDirectory
+
+  $customAppsSource = ".\CustomAppsList.txt"
+  $customAppsDest   = "$buildDirectory\CustomAppsList.txt"
+
+  if (Test-Path $customAppsSource) { Write-CleanLine "Copying CustomAppsList.txt to build directory..."; Copy-Item -Path $customAppsSource -Destination $customAppsDest -Force } else { Write-CleanLine "WARNING: CustomAppsList.txt not found, skipping." }
 
   $convertConfig = (Get-Content $buildDirectory/ConvertConfig.ini) `
     -replace '^(AutoExit\s*)=.*','$1=1' `
