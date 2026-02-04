@@ -330,6 +330,11 @@ function Get-WindowsIso($name, $destinationDirectory) {
   if (Test-Path $buildDirectory) { Remove-Item -Force -Recurse $buildDirectory | Out-Null }
   New-Item -ItemType Directory -Force $buildDirectory | Out-Null
 
+  $customAppsSource = ".\CustomAppsList.txt"
+  $customAppsDest   = "$buildDirectory\CustomAppsList.txt"
+
+  if (Test-Path $customAppsSource) { Write-CleanLine "Copying CustomAppsList.txt to build directory..."; Copy-Item -Path $customAppsSource -Destination $customAppsDest -Force } else { Write-CleanLine "WARNING: CustomAppsList.txt not found, skipping." }
+
   $edn = if ($hasVirtualMember) { $iso.virtualEdition } else { $effectiveEdition }
   Write-CleanLine $edn
   $title = "$name $edn $($iso.build)"
@@ -342,7 +347,9 @@ function Get-WindowsIso($name, $destinationDirectory) {
   $convertConfig = (Get-Content $buildDirectory/ConvertConfig.ini) `
     -replace '^(AutoExit\s*)=.*','$1=1' `
     -replace '^(ResetBase\s*)=.*','$1=1' `
-    -replace '^(Cleanup\s*)=.*','$1=1'
+    -replace '^(Cleanup\s*)=.*','$1=1' `
+    -replace '^(CustomList\s*)=.*','$1=1' `
+    -replace '^(SkipEdge\s*)=.*','$1=1'
 
   $tag = ""
   if ($esd) { $convertConfig = $convertConfig -replace '^(wim2esd\s*)=.*', '$1=1'; $tag += ".E" }
