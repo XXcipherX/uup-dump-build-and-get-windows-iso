@@ -23,7 +23,7 @@ MicrosoftWindows.Client.WebExperience_cw5n1h2txyewy
 # Microsoft.WindowsCalculator_8wekyb3d8bbwe
 # Microsoft.WindowsMaps_8wekyb3d8bbwe
 # Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe
-# Microsoft.ScreenSketch_8wekyb3d8bbwe
+Microsoft.ScreenSketch_8wekyb3d8bbwe
 # microsoft.windowscommunicationsapps_8wekyb3d8bbwe
 # Microsoft.People_8wekyb3d8bbwe
 # Microsoft.BingNews_8wekyb3d8bbwe
@@ -84,3 +84,4 @@ Microsoft.AV1VideoExtension_8wekyb3d8bbwe
 # Microsoft.Office.Excel_8wekyb3d8bbwe
 # Microsoft.Office.PowerPoint_8wekyb3d8bbwe
 # Microsoft.Office.Word_8wekyb3d8bbwe
+
