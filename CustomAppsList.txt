@@ -18,7 +18,7 @@ Microsoft.Windows.Photos_8wekyb3d8bbwe
 Microsoft.WindowsNotepad_8wekyb3d8bbwe
 # Microsoft.Paint_8wekyb3d8bbwe
 Microsoft.WindowsTerminal_8wekyb3d8bbwe
-MicrosoftWindows.Client.WebExperience_cw5n1h2txyewy
+# MicrosoftWindows.Client.WebExperience_cw5n1h2txyewy
 # Microsoft.WindowsAlarms_8wekyb3d8bbwe
 # Microsoft.WindowsCalculator_8wekyb3d8bbwe
 # Microsoft.WindowsMaps_8wekyb3d8bbwe
@@ -51,7 +51,7 @@ Microsoft.ApplicationCompatibilityEnhancements_8wekyb3d8bbwe
 # MSTeams_8wekyb3d8bbwe
 # Microsoft.MicrosoftPCManager_8wekyb3d8bbwe
 # Microsoft.StartExperiencesApp_8wekyb3d8bbwe
-Microsoft.WidgetsPlatformRuntime_8wekyb3d8bbwe
+# Microsoft.WidgetsPlatformRuntime_8wekyb3d8bbwe
 
 ### Media Apps / Client non-N editions
 # Microsoft.ZuneMusic_8wekyb3d8bbwe
@@ -84,4 +84,5 @@ Microsoft.AV1VideoExtension_8wekyb3d8bbwe
 # Microsoft.Office.Excel_8wekyb3d8bbwe
 # Microsoft.Office.PowerPoint_8wekyb3d8bbwe
 # Microsoft.Office.Word_8wekyb3d8bbwe
+
 
