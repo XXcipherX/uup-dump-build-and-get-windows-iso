@@ -109,7 +109,7 @@ jobs:
     runs-on: ${{ fromJSON('{"x64":"windows-latest","arm64":"windows-11-arm"}')[inputs.architecture] }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Map inputs
         id: map
@@ -216,7 +216,7 @@ jobs:
 
       - name: Upload ISO artifact
         id: upload_iso_artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.ISO_NAME }}
           path: c:/output/*.ISO
@@ -320,7 +320,7 @@ jobs:
 
       - name: Create Release
         id: create_release
-        uses: softprops/action-gh-release@v2.3.2
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
