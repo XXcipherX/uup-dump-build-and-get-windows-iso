@@ -7,11 +7,7 @@ This shrink wraps the [UUP dump](https://git.uupdump.net/uup-dump) project into 
 # The whole was written for the use with Github Actions.
 Just fork this repository and use Github Actions to build your own version.
 
-Once the GitHub actions are complete, you'll receive a finished ISO image in two flavors.
-
-1. Release with the .iso file split into several parts (as GitHub doesn't allow files larger than 2GB to be included in a release).
-Additionally, for each release, packages are created for various systems and architectures, containing a ready-made script that downloads all parts of the split ISO and returns the finished ISO file.
-2. Artifacts - a single zip file, but logging in to the website is required to download.
+Once the GitHub Actions workflow is complete, the finished ISO image will be available as a **workflow artifact**. You can download it from the Actions tab of your repository.
 
 # You can also executed directly on a Windows x64 or arm64 host (min. 21H2).
 
@@ -104,20 +100,6 @@ powershell uup-dump-get-windows-iso.ps1 windows-11new c:/output -architecture x6
 ```
 
 
-## Tags structure
-
-```text
-  .------------------------------- OS Build
-  |    .-------------------------- System Revision
-  |    |    .--------------------- Release Channel/Version
-  |    |    |    .---------------- System Edition
-  |    |    |    |   .------------ CPU architecture
-  |    |    |    |   |  .--------- Language
-  |    |    |    |   |  |  .------ Image is compressed by ESD (optional)
-  |    |    |    |   |  |  | .---- Include .NET Framework 3.5 (optional)
-__|__ _|__ _|__ _|_ _|_ |_ | |
-26200.7899.25H2.PRO.X64.PL.E.N
-```
 
 ## Related Tools
 
