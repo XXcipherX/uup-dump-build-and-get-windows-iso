@@ -8,7 +8,6 @@ param(
   [ValidateSet("nb-no", "fr-ca", "fi-fi", "lv-lv", "es-es", "en-gb", "zh-tw", "th-th", "sv-se", "en-us", "es-mx", "bg-bg", "hr-hr", "pt-br", "el-gr", "cs-cz", "it-it", "sk-sk", "pl-pl", "sl-si", "neutral", "ja-jp", "et-ee", "ro-ro", "fr-fr", "pt-pt", "ar-sa", "lt-lt", "hu-hu", "da-dk", "zh-cn", "uk-ua", "tr-tr", "ru-ru", "nl-nl", "he-il", "ko-kr", "sr-latn-rs", "de-de")]
   [string]$lang = "en-us",
   [switch]$esd,
-  [switch]$drivers,
   [switch]$netfx3,
   [string]$revision
 )
@@ -359,12 +358,6 @@ function Get-WindowsIso($name, $destinationDirectory) {
 
   $tag = ""
   if ($esd) { $convertConfig = $convertConfig -replace '^(wim2esd\s*)=.*', '$1=1'; $tag += ".E" }
-  if ($drivers -and $arch -ne "arm64") {
-    $convertConfig = $convertConfig -replace '^(AddDrivers\s*)=.*', '$1=1'
-    $tag += ".D"
-    Write-CleanLine "Copy Dell drivers to $buildDirectory directory"
-    Copy-Item -Path Drivers -Destination $buildDirectory/Drivers -Recurse
-  }
   if ($netfx3) { $convertConfig = $convertConfig -replace '^(NetFx3\s*)=.*', '$1=1'; $tag += ".N" }
   if ($hasVirtualMember) {
     $convertConfig = $convertConfig `

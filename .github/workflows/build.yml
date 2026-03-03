@@ -13,7 +13,6 @@ run-name: >
     "Ukrainian (Ukraine)":"UK","Chinese (Simplified, China)":"ZH","Chinese (Traditional, Taiwan)":"ZH"
   }')[inputs.language] }}
   ${{ inputs.esd && 'ESD' || '' }}
-  ${{ inputs.drivers && 'DRIVERS' || '' }}
   ${{ inputs.netfx3 && 'NETFX3' || '' }}
 
 on:
@@ -104,11 +103,6 @@ on:
         type: boolean
         required: true
         default: false
-      drivers:
-        description: "Add additional drivers (only for x64)"
-        type: boolean
-        required: true
-        default: false
 
 jobs:
   build:
@@ -179,9 +173,6 @@ jobs:
 
           $opts = ''
           if ('${{ inputs.esd }}' -eq 'true')     { $opts += ' -esd' }
-          if (('${{ inputs.drivers }}' -eq 'true') -and ('${{ inputs.architecture }}' -ne 'arm64')) {
-            $opts += ' -drivers'
-          }
           if ('${{ inputs.netfx3 }}' -eq 'true')  { $opts += ' -netfx3' }
           if (-not [string]::IsNullOrWhiteSpace('${{ inputs.revision }}')) {
             $opts += ' -revision "${{ inputs.revision }}"'
@@ -265,7 +256,6 @@ jobs:
             # map short flags to full descriptions from workflow inputs
             $descMap = @{
               '-esd'     = 'Use ESD compression'
-              '-drivers' = 'Add additional drivers'
               '-netfx3'  = 'Add .NET Framework 3.5'
             }
             # split -> normalize -> map -> deduplicate
