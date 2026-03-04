@@ -206,14 +206,12 @@ jobs:
         shell: pwsh
         run: |
           pwsh uup-dump-get-windows-iso.ps1 ${{ steps.map.outputs.version }} c:/output -architecture ${{ inputs.architecture }} -edition ${{ inputs.edition }} -lang ${{ steps.map.outputs.lang }} ${{ steps.map.outputs.options }}
-          echo "iso_name=$env:ISO_NAME" >> $env:GITHUB_OUTPUT
-          echo "ISO_NAME=$env:ISO_NAME" >> $env:GITHUB_ENV
 
       - name: Upload ISO artifact
         id: upload_iso_artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.build_windows.outputs.iso_name }}
+          name: ${{ env.ISO_NAME }}
           path: c:/output/*.ISO
           if-no-files-found: error
 
